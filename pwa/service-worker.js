@@ -1,4 +1,4 @@
-const CACHE_NAME = "finnest-v1";
+const CACHE_NAME = "finnest-v2";
 
 const APP_SHELL = [
     "./",
@@ -6,6 +6,7 @@ const APP_SHELL = [
     "./css/styles.css",
     "./css/variables.css",
     "./js/app.js",
+    "./js/auth-data-gate.js",
     "./pwa/manifest.json"
 ];
 
@@ -33,11 +34,14 @@ self.addEventListener("fetch", event => {
     if (event.request.method !== "GET") return;
 
     event.respondWith(
-        caches.match(event.request)
-            .then(cached => cached || fetch(event.request).then(response => {
-                const copy = response.clone();
-                caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        fetch(event.request)
+            .then(response => {
+                if (response && response.ok && new URL(event.request.url).origin === self.location.origin) {
+                    const copy = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+                }
                 return response;
-            }).catch(() => caches.match("./index.html")))
+            })
+            .catch(() => caches.match(event.request).then(cached => cached || caches.match("./index.html")))
     );
 });
