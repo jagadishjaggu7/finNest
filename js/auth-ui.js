@@ -18,8 +18,6 @@
         localStorage.removeItem('finnest_supabase_id_map');
         localStorage.removeItem('finnest_profile');
         localStorage.removeItem('finnest_view_mode');
-        try { window.expenses = []; window.incomes = []; window.budgets = {}; } catch (_) { /* module globals are not window properties */ }
-        if (typeof window.renderDashboard === 'function') window.renderDashboard();
     }
 
     async function applySession(session) {
@@ -43,8 +41,13 @@
         const { data } = await supabase.auth.getSession();
         await applySession(data.session);
         supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+            if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
                 setTimeout(() => applySession(session), 0);
+            }
+            if (event === 'SIGNED_OUT') {
+                clearSignedOutData();
+                // app.js keeps its in-memory arrays, so reload to guarantee a clean signed-out dashboard.
+                setTimeout(() => location.reload(), 0);
             }
         });
     }
