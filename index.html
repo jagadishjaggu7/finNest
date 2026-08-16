@@ -1,15 +1,649 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="FinNest — Track together. Save smarter.">
-  <title>FinNest</title>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description" content="FinNest — Track together. Save smarter.">
+
+    <title>FinNest</title>
+
+    <link rel="stylesheet" href="css/styles.css">
 </head>
+
 <body>
-  <main>
-    <h1>FinNest</h1>
-    <p>Track together. Save smarter.</p>
-  </main>
+
+    <div id="app">
+
+        <!-- Header -->
+        <header class="app-header">
+
+            <div class="brand">
+                <div class="brand-logo">₹</div>
+
+                <span class="brand-name">
+                    FinNest
+                </span>
+            </div>
+
+            <div class="header-actions">
+
+                <button class="icon-button" aria-label="Notifications">
+                    🔔
+                </button>
+
+                <button class="profile-button" aria-label="Profile">
+                    J
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- Main Layout -->
+        <div class="app-layout">
+
+            <!-- Sidebar -->
+            <aside class="sidebar">
+
+                <nav class="sidebar-nav">
+
+                    <button class="nav-item active">
+                        <span>🏠</span>
+                        <span>Dashboard</span>
+                    </button>
+
+                    <button class="nav-item">
+                        <span>💸</span>
+                        <span>Expenses</span>
+                    </button>
+
+                    <button class="nav-item">
+                        <span>💰</span>
+                        <span>Budgets</span>
+                    </button>
+
+                    <button class="nav-item">
+                        <span>📊</span>
+                        <span>Reports</span>
+                    </button>
+
+                    <button class="nav-item">
+                        <span>👨‍👩‍👧</span>
+                        <span>Family</span>
+                    </button>
+
+                    <button class="nav-item">
+                        <span>🏦</span>
+                        <span>Accounts</span>
+                    </button>
+
+                    <button class="nav-item">
+                        <span>⚙️</span>
+                        <span>Settings</span>
+                    </button>
+
+                </nav>
+
+            </aside>
+
+
+            <!-- Main Content -->
+            <main class="main-content">
+
+                <!-- Page Header -->
+                <section class="page-header">
+
+                    <div>
+                        <p class="eyebrow">
+                            Sunday, 16 August
+                        </p>
+
+                        <h1>
+                            Good morning, Jaggu 👋
+                        </h1>
+                    </div>
+
+                </section>
+
+
+                <!-- Financial Summary -->
+                <section class="summary-grid">
+
+                    <article class="summary-card">
+                        <div class="summary-card-top">
+                            <span>Available</span>
+                            <span class="summary-icon">₹</span>
+                        </div>
+
+                        <strong id="totalBalance">₹0</strong>
+                        <p class="positive">
+                            ↑ 8.5% vs last month
+                        </p>
+                    </article>
+
+
+                    <article class="summary-card">
+                        <div class="summary-card-top">
+                            <span>Income</span>
+                            <span class="summary-icon income">↓</span>
+                        </div>
+
+                        <strong id="totalIncome">₹0</strong>
+                        <p class="positive">
+                            ↑ 12.3% vs last month
+                        </p>
+                    </article>
+
+
+                    <article class="summary-card">
+                        <div class="summary-card-top">
+                            <span>Expenses</span>
+                            <span class="summary-icon expense">↑</span>
+                        </div>
+
+                        <strong id="totalExpenses">₹0</strong>
+                        <p class="negative">
+                            ↑ 5.7% vs last month
+                        </p>
+                    </article>
+
+
+                    <article class="summary-card">
+                        <div class="summary-card-top">
+                            <span>Savings Rate</span>
+                            <span class="summary-icon savings">♧</span>
+                        </div>
+
+                        <strong id="savingsRate">0%</strong>
+                        <p class="positive">
+                            ↑ 15.2% vs last month
+                        </p>
+                    </article>
+
+                </section>
+
+
+                <!-- Main Dashboard Grid -->
+                <section class="dashboard-grid">
+
+                    <!-- Expense Overview -->
+                    <article class="dashboard-card expense-overview">
+
+                        <div class="card-header">
+
+                            <h2>Expense Overview</h2>
+
+                            <select>
+                                <option>This Month</option>
+                                <option>Last Month</option>
+                                <option>This Year</option>
+                            </select>
+
+                        </div>
+
+
+                        <div class="chart-area">
+
+                            <div class="donut-chart">
+                                <div class="donut-center">
+                                    <strong id="donutTotal">₹0</strong>
+                                    <span>Total</span>
+                                </div>
+                            </div>
+
+
+                            <div class="category-list" id="expenseCategoryList">
+                            </div>
+
+                        </div>
+
+                        <button class="text-link">
+                            View report →
+                        </button>
+
+                    </article>
+
+
+                    <!-- Recent Transactions -->
+                    <article class="dashboard-card">
+
+                        <div class="card-header">
+
+                            <h2>Recent Transactions</h2>
+
+                            <button class="text-link">
+                                View All
+                            </button>
+
+                        </div>
+
+
+                        <div class="transactions" id="recentTransactions">
+                            <div class="transaction">
+
+                                <div class="transaction-icon food-icon">
+                                    🛍️
+                                </div>
+
+                                <div class="transaction-info">
+                                    <strong>Grocery Store</strong>
+                                    <span>Food & Dining</span>
+                                </div>
+
+                                <strong class="amount expense-amount">
+                                    -₹1,250
+                                </strong>
+
+                            </div>
+
+
+                            <div class="transaction">
+
+                                <div class="transaction-icon income-icon">
+                                    ₹
+                                </div>
+
+                                <div class="transaction-info">
+                                    <strong>Salary</strong>
+                                    <span>Income</span>
+                                </div>
+
+                                <strong class="amount income-amount">
+                                    +₹45,000
+                                </strong>
+
+                            </div>
+
+
+                            <div class="transaction">
+
+                                <div class="transaction-icon bill-icon">
+                                    ⚡
+                                </div>
+
+                                <div class="transaction-info">
+                                    <strong>Electricity Bill</strong>
+                                    <span>Bills & Utilities</span>
+                                </div>
+
+                                <strong class="amount expense-amount">
+                                    -₹2,460
+                                </strong>
+
+                            </div>
+
+
+                            <div class="transaction">
+
+                                <div class="transaction-icon transport-icon">
+                                    🚗
+                                </div>
+
+                                <div class="transaction-info">
+                                    <strong>Uber Ride</strong>
+                                    <span>Transport</span>
+                                </div>
+
+                                <strong class="amount expense-amount">
+                                    -₹320
+                                </strong>
+
+                            </div>
+
+
+                            <div class="transaction">
+
+                                <div class="transaction-icon entertainment-icon">
+                                    ▶
+                                </div>
+
+                                <div class="transaction-info">
+                                    <strong>Netflix Subscription</strong>
+                                    <span>Entertainment</span>
+                                </div>
+
+                                <strong class="amount expense-amount">
+                                    -₹499
+                                </strong>
+
+                            </div>
+
+                        </div>
+
+                    </article>
+
+                </section>
+
+
+                <!-- Budget Overview -->
+                <section class="dashboard-card budget-section">
+
+                    <div class="card-header">
+
+                        <h2>Budget Overview</h2>
+
+                        <button class="text-link">
+                            View All Budgets →
+                        </button>
+
+                    </div>
+
+
+                    <div class="budget-grid">
+
+                        <div class="budget-card">
+
+                            <div class="budget-title">
+                                🍴
+                                <span>Food & Dining</span>
+                            </div>
+
+                            <div class="budget-values">
+                                ₹6,450 / ₹8,000
+                            </div>
+
+                            <div class="progress-track">
+                                <div class="progress-fill" style="width:81%"></div>
+                            </div>
+
+                            <small>81% used</small>
+
+                        </div>
+
+
+                        <div class="budget-card">
+
+                            <div class="budget-title">
+                                🛍️
+                                <span>Shopping</span>
+                            </div>
+
+                            <div class="budget-values">
+                                ₹2,800 / ₹5,000
+                            </div>
+
+                            <div class="progress-track">
+                                <div class="progress-fill" style="width:56%"></div>
+                            </div>
+
+                            <small>56% used</small>
+
+                        </div>
+
+
+                        <div class="budget-card">
+
+                            <div class="budget-title">
+                                🚗
+                                <span>Transport</span>
+                            </div>
+
+                            <div class="budget-values">
+                                ₹3,200 / ₹4,000
+                            </div>
+
+                            <div class="progress-track">
+                                <div class="progress-fill" style="width:80%"></div>
+                            </div>
+
+                            <small>80% used</small>
+
+                        </div>
+
+
+                        <div class="budget-card">
+
+                            <div class="budget-title">
+                                🎬
+                                <span>Entertainment</span>
+                            </div>
+
+                            <div class="budget-values">
+                                ₹1,900 / ₹3,000
+                            </div>
+
+                            <div class="progress-track">
+                                <div class="progress-fill" style="width:63%"></div>
+                            </div>
+
+                            <small>63% used</small>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+            </main>
+
+            <!-- Add Expense Sheet -->
+            <div class="expense-sheet-backdrop" id="expenseSheet">
+
+                <div class="expense-sheet">
+
+                    <div class="sheet-handle"></div>
+
+                    <div class="sheet-header">
+                        <div>
+                            <p class="eyebrow">FinNest</p>
+                            <h2>Add Expense</h2>
+                        </div>
+
+                        <button class="sheet-close" id="closeExpenseSheet" aria-label="Close">
+                            ×
+                        </button>
+                    </div>
+
+
+                    <!-- Amount -->
+
+                    <div class="expense-field">
+
+                        <label for="expenseAmount">
+                            Amount
+                        </label>
+
+                        <div class="amount-input-wrapper">
+
+                            <span>₹</span>
+
+                            <input type="number" id="expenseAmount" placeholder="0" inputmode="decimal" min="0"
+                                step="0.01">
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Category -->
+
+                    <div class="expense-field">
+
+                        <label>
+                            Category
+                        </label>
+
+                        <div class="category-chips">
+
+                            <button class="category-chip selected" data-category="Food & Dining">
+                                🍴
+                                <span>Food</span>
+                            </button>
+
+                            <button class="category-chip" data-category="Transport">
+                                🚗
+                                <span>Transport</span>
+                            </button>
+
+                            <button class="category-chip" data-category="Shopping">
+                                🛍️
+                                <span>Shopping</span>
+                            </button>
+
+                            <button class="category-chip" data-category="Bills & Utilities">
+                                💡
+                                <span>Bills</span>
+                            </button>
+
+                            <button class="category-chip" data-category="Health">
+                                ❤️
+                                <span>Health</span>
+                            </button>
+
+                            <button class="category-chip" data-category="Entertainment">
+                                🎬
+                                <span>Fun</span>
+                            </button>
+
+                            <button class="category-chip" data-category="Other">
+                                •••
+                                <span>Other</span>
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Account -->
+
+                    <div class="expense-field">
+
+                        <label for="expenseAccount">
+                            Account
+                        </label>
+
+                        <select id="expenseAccount">
+
+                            <option value="UPI">
+                                📱 UPI
+                            </option>
+
+                            <option value="Bank Account">
+                                🏦 Bank Account
+                            </option>
+
+                            <option value="Cash">
+                                💵 Cash
+                            </option>
+
+                            <option value="Credit Card">
+                                💳 Credit Card
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Expense Type -->
+
+                    <div class="expense-field">
+
+                        <label>
+                            Expense type
+                        </label>
+
+                        <div class="expense-type-toggle">
+
+                            <button class="type-option selected" data-type="personal">
+                                Personal
+                            </button>
+
+                            <button class="type-option" data-type="shared">
+                                Shared
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Note -->
+
+                    <div class="expense-field">
+
+                        <label for="expenseNote">
+                            Note
+                            <span>(optional)</span>
+                        </label>
+
+                        <input type="text" id="expenseNote" placeholder="e.g. Monthly groceries">
+
+                    </div>
+
+
+                    <!-- Date -->
+
+                    <div class="expense-field">
+
+                        <label for="expenseDate">
+                            Date
+                        </label>
+
+                        <input type="date" id="expenseDate">
+
+                    </div>
+
+
+                    <!-- Actions -->
+
+                    <div class="expense-actions">
+
+                        <button class="cancel-expense" id="cancelExpense">
+                            Cancel
+                        </button>
+
+                        <button class="save-expense" id="saveExpense">
+                            Add Expense
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Desktop Add Expense Button -->
+            <button class="desktop-add-expense" id="desktopAddExpense" aria-label="Add expense">
+                <span>+</span>
+                <span>Add Expense</span>
+            </button>
+            <!-- Mobile Navigation -->
+            <nav class="mobile-nav">
+
+                <button class="mobile-nav-item active">
+                    <span>🏠</span>
+                    <small>Home</small>
+                </button>
+
+                <button class="mobile-nav-item">
+                    <span>💸</span>
+                    <small>Expenses</small>
+                </button>
+
+                <button class="add-expense-button">
+                    +
+                </button>
+
+                <button class="mobile-nav-item">
+                    <span>📊</span>
+                    <small>Reports</small>
+                </button>
+
+                <button class="mobile-nav-item">
+                    <span>⋯</span>
+                    <small>More</small>
+                </button>
+
+            </nav>
+
+        </div>
+        <script src="js/app.js"></script>
 </body>
+
 </html>
