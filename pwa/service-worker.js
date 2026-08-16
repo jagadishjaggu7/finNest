@@ -1,4 +1,4 @@
-const CACHE_NAME = "finnest-v3";
+const CACHE_NAME = "finnest-v4";
 
 const APP_SHELL = [
     "./",
