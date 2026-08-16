@@ -1,0 +1,10 @@
+/* FinNest design tokens — Phase 2 will expand these. */
+:root {
+  --color-primary: #10B981;
+  --color-secondary: #334155;
+  --color-accent: #F59E0B;
+  --color-success: #22C55E;
+  --color-error: #EF4444;
+  --color-background: #FFFFFF;
+  --color-surface: #F8FAFC;
+}

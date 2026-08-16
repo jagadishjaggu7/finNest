@@ -1,0 +1,13 @@
+/* Global styles will be built in Phase 2. */
+@import url("./variables.css");
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: var(--color-background);
+  color: var(--color-secondary);
+}

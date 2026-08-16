@@ -1,0 +1,10 @@
+{
+  "name": "FinNest",
+  "short_name": "FinNest",
+  "description": "Track together. Save smarter.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#10B981",
+  "background_color": "#FFFFFF",
+  "icons": []
+}

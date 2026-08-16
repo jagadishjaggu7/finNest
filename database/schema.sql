@@ -1,0 +1,1 @@
+-- FinNest database schema will be designed in Phase 3.
