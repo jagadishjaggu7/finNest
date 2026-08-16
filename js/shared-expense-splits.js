@@ -80,6 +80,7 @@
     }
 
     function currentUserId() { return window.finnestAuthUser?.id || null; }
+    function uiExpenseType() { return document.querySelector('.type-option.selected')?.dataset.type || 'personal'; }
     function updateVisibility(){const field=document.getElementById('finnestSplitField');if(!field)return;const shared=lastExpenseType==='shared';field.hidden=!shared;const error=document.getElementById('finnestSplitError');if(error&&!shared)error.classList.remove('show');}
     function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 
@@ -108,11 +109,19 @@
         finally{syncing=false;}
     }
 
-    function hookTypeButtons(){document.querySelectorAll('.type-option').forEach(btn=>{if(btn.dataset.splitHooked)return;btn.dataset.splitHooked='1';btn.addEventListener('click',async()=>{lastExpenseType=btn.dataset.type||'personal';if(lastExpenseType==='shared'){await loadMembers();try{await loadExistingSplit();}catch(error){console.warn('FinNest existing split could not be loaded',error);}renderField();}else{updateVisibility();}});});}
-    function hookSave(){const save=document.getElementById('saveExpense');if(!save||save.dataset.splitHooked)return;save.dataset.splitHooked='1';save.addEventListener('click',e=>{const shared=document.querySelector('.type-option.selected')?.dataset.type==='shared';lastExpenseType=shared?'shared':'personal';if(!shared)return;if(!selected.size){e.preventDefault();e.stopImmediatePropagation();document.getElementById('finnestSplitError')?.classList.add('show');return;}setTimeout(syncLatestSplit,900);},true);}
+    async function activateSharedMode(){
+        lastExpenseType = 'shared';
+        await loadMembers();
+        try { await loadExistingSplit(); } catch(error) { console.warn('FinNest existing split could not be loaded',error); }
+        renderField();
+    }
+
+    function hookTypeButtons(){document.querySelectorAll('.type-option').forEach(btn=>{if(btn.dataset.splitHooked)return;btn.dataset.splitHooked='1';btn.addEventListener('click',async()=>{if(btn.dataset.type==='shared')await activateSharedMode();else{lastExpenseType='personal';updateVisibility();}});});}
+    function hookSave(){const save=document.getElementById('saveExpense');if(!save||save.dataset.splitHooked)return;save.dataset.splitHooked='1';save.addEventListener('click',e=>{const shared=uiExpenseType()==='shared';lastExpenseType=shared?'shared':'personal';if(!shared)return;if(!selected.size){e.preventDefault();e.stopImmediatePropagation();document.getElementById('finnestSplitError')?.classList.add('show');return;}setTimeout(syncLatestSplit,900);},true);}
     function resetOnSheetClose(){document.addEventListener('click',e=>{if(e.target.closest('#closeExpenseSheet,#cancelExpense')){selected=new Set();payerId=null;lastExpenseType='personal';editingLocalId=null;}});}
     function captureExpenseContext(){document.addEventListener('click',e=>{const row=e.target.closest('[data-expense-id]');if(row){editingLocalId=Number(row.dataset.expenseId);return;}if(e.target.closest('#desktopAddExpense,.add-expense-button,#viewAddExpense,#familyAddExpense'))editingLocalId=null;},true);}
+    function observeTypeChanges(){const sheet=document.getElementById('expenseSheet');if(!sheet)return;new MutationObserver(async()=>{if(!sheet.classList.contains('open'))return;const type=uiExpenseType();if(type==='shared'&&lastExpenseType!=='shared')await activateSharedMode();else if(type==='personal'){lastExpenseType='personal';updateVisibility();}}).observe(sheet,{attributes:true,subtree:true,attributeFilter:['class']});}
 
-    async function init(){styles();await loadMembers();const observer=new MutationObserver(()=>{hookTypeButtons();hookSave();if(document.querySelector('.expense-sheet')&&!document.getElementById('finnestSplitField'))renderField();});observer.observe(document.body,{childList:true,subtree:true});hookTypeButtons();hookSave();renderField();resetOnSheetClose();captureExpenseContext();document.addEventListener('finnest:authenticated',async()=>{await loadMembers();renderField();});}
+    async function init(){styles();await loadMembers();const observer=new MutationObserver(()=>{hookTypeButtons();hookSave();if(document.querySelector('.expense-sheet')&&!document.getElementById('finnestSplitField'))renderField();});observer.observe(document.body,{childList:true,subtree:true});hookTypeButtons();hookSave();renderField();resetOnSheetClose();captureExpenseContext();observeTypeChanges();document.addEventListener('finnest:authenticated',async()=>{await loadMembers();renderField();});}
     document.addEventListener('DOMContentLoaded',init);
 })();
