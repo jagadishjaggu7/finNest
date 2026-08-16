@@ -1,4 +1,4 @@
-/* FinNest shared expenses: choose household members, payer and equal shares. */
+/* FinNest shared expenses: default all household members and current user as payer. */
 (function () {
     const supabase = window.finnestSupabase;
     if (!supabase) return;
@@ -28,17 +28,23 @@
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData?.session?.user;
         if (!user) { members = []; return; }
+
         const { data, error } = await supabase.from('household_members')
             .select('id, household_id, user_id, display_name, role, created_at')
             .eq('user_id', user.id).order('created_at', { ascending: true });
         if (error || !data?.length) { members = []; return; }
+
         const householdId = data[0].household_id;
         const result = await supabase.from('household_members')
             .select('id, household_id, user_id, display_name, role, created_at')
             .eq('household_id', householdId).order('created_at', { ascending: true });
         members = result.data || data;
-        if (!payerId || !members.some(m => m.id === payerId)) payerId = members[0]?.id || null;
-        if (!selected.size) members.forEach(m => selected.add(m.id));
+
+        // Default payer is always the currently signed-in user ("Me"), not an arbitrary member.
+        payerId = members.find(m => m.user_id === user.id)?.id || members.find(m => m.role === 'owner')?.id || members[0]?.id || null;
+
+        // Default shared expense includes every household member.
+        selected = new Set(members.map(m => m.id));
     }
 
     function renderField() {
@@ -53,12 +59,16 @@
           <span class="split-field-label">👨‍👩‍👧 Who shares this expense?</span>
           <div class="split-members">${members.map(m => `<label class="split-member"><input type="checkbox" value="${m.id}" ${selected.has(m.id) ? 'checked' : ''}> <span>${escapeHtml(m.display_name)}${m.role === 'owner' ? ' · Owner' : ''}</span></label>`).join('') || '<span class="split-hint">No family members found yet. Invite people from Family first.</span>'}</div>
           <span class="split-field-label" style="margin-top:12px">💳 Paid by</span>
-          <select class="split-payer" id="finnestSplitPayer">${members.map(m => `<option value="${m.id}" ${payerId === m.id ? 'selected' : ''}>${escapeHtml(m.display_name)}</option>`).join('')}</select>
-          <div class="split-hint">FinNest currently splits the expense equally between selected members. The payer is tracked separately so we can calculate settlements later.</div>
+          <select class="split-payer" id="finnestSplitPayer">${members.map(m => `<option value="${m.id}" ${payerId === m.id ? 'selected' : ''}>${escapeHtml(m.display_name)}${m.user_id === currentUserId() ? ' · Me' : ''}</option>`).join('')}</select>
+          <div class="split-hint">All family members are selected by default. You can unselect anyone for this particular expense. Paid by defaults to you.</div>
           <div id="finnestSplitError" class="split-error">Select at least one family member for a shared expense.</div>`;
         field.querySelectorAll('input[type=checkbox]').forEach(input => input.addEventListener('change', e => { if(e.target.checked)selected.add(e.target.value);else selected.delete(e.target.value); }));
         field.querySelector('#finnestSplitPayer')?.addEventListener('change', e => payerId=e.target.value);
         updateVisibility();
+    }
+
+    function currentUserId() {
+        return window.finnestAuthUser?.id || null;
     }
 
     function updateVisibility(){const field=document.getElementById('finnestSplitField');if(!field)return;const shared=lastExpenseType==='shared';field.hidden=!shared;const error=document.getElementById('finnestSplitError');if(error&&!shared)error.classList.remove('show');}
