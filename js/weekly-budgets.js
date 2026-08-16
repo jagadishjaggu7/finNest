@@ -1,4 +1,4 @@
-/* FinNest weekly budgets — category tracking with Monday-Sunday periods. */
+/* FinNest weekly budgets — personal category tracking with Monday-Sunday periods. */
 (function () {
     const supabase = window.finnestSupabase;
     if (!supabase) return;
@@ -24,8 +24,8 @@
       const u=await user(); if(!u)return null;
       const start=monday(); const end=sunday(start); const startKey=dateKey(start), endKey=dateKey(end);
       const [b,e]=await Promise.all([
-        supabase.from('budgets').select('id,category,amount,period_start,period_type').eq('user_id',u.id).eq('period_type','weekly').eq('period_start',startKey).order('category'),
-        supabase.from('expenses').select('id,category,amount,expense_date').eq('user_id',u.id).gte('expense_date',startKey).lte('expense_date',endKey)
+        supabase.from('budgets').select('id,category,amount,period_start,period_type').eq('user_id',u.id).eq('budget_scope','personal').eq('period_type','weekly').eq('period_start',startKey).order('category'),
+        supabase.from('expenses').select('id,category,amount,expense_date').eq('user_id',u.id).eq('expense_type','personal').gte('expense_date',startKey).lte('expense_date',endKey)
       ]);
       const spent={};(e.data||[]).forEach(x=>{spent[x.category]=(spent[x.category]||0)+Number(x.amount||0);});
       return {start,end,budgets:b.data||[],spent};
@@ -34,7 +34,7 @@
     async function saveBudget(category, amount){
       const u=await user(); if(!u)return;
       const startKey=dateKey(monday());
-      const {data,error}=await supabase.from('budgets').upsert({user_id:u.id,category,amount:Number(amount),month_start:startKey,period_type:'weekly',period_start:startKey},{onConflict:'user_id,category,period_type,period_start'}).select().single();
+      const {data,error}=await supabase.from('budgets').upsert({user_id:u.id,category,amount:Number(amount),month_start:startKey,period_type:'weekly',period_start:startKey,budget_scope:'personal',household_id:null},{onConflict:'user_id,category,period_type,period_start'}).select().single();
       if(error) alert(error.message); return data;
     }
 
@@ -49,9 +49,9 @@
       if(!data){panel.innerHTML='<div class="weekly-empty">Sign in to use cloud weekly budgets.</div>';return;}
       const range=`${data.start.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${data.end.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}`;
       const totalBudget=data.budgets.reduce((s,b)=>s+Number(b.amount||0),0); const totalSpent=Object.values(data.spent).reduce((s,v)=>s+v,0);
-      panel.innerHTML=`<div class="weekly-head"><div><h3>📅 Weekly Budget</h3><p>${range} · ${money(totalSpent)} spent of ${money(totalBudget)}</p></div><span class="eyebrow">MON–SUN</span></div>
+      panel.innerHTML=`<div class="weekly-head"><div><h3>📅 Weekly Personal Budget</h3><p>${range} · ${money(totalSpent)} spent of ${money(totalBudget)}</p></div><span class="eyebrow">MON–SUN</span></div>
         <div class="weekly-form"><select id="weeklyCategory">${CATEGORIES.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}</select><input id="weeklyAmount" type="number" min="0" step="100" placeholder="₹ limit"><button id="weeklySave">Set Budget</button></div>
-        <div class="weekly-list">${data.budgets.length?data.budgets.map(b=>{const spent=Number(data.spent[b.category]||0),limit=Number(b.amount||0),pct=limit?Math.min(100,(spent/limit)*100):0;return `<div class="weekly-row"><div class="weekly-row-top"><div><div class="weekly-row-name">${escapeHtml(b.category)}</div><div class="weekly-row-meta">${money(spent)} spent · ${money(Math.max(0,limit-spent))} left</div></div><strong>${money(limit)}</strong></div><div class="weekly-track"><div class="weekly-fill ${spent>limit?'over':''}" style="width:${pct}%"></div></div><div class="weekly-actions"><button data-edit-weekly="${b.id}" data-category="${escapeHtml(b.category)}" data-amount="${limit}">Edit</button><button data-delete-weekly="${b.id}">Delete</button></div></div>`}).join(''):'<div class="weekly-empty">No weekly budgets yet. Add your first category limit above.</div>'}</div>`;
+        <div class="weekly-list">${data.budgets.length?data.budgets.map(b=>{const spent=Number(data.spent[b.category]||0),limit=Number(b.amount||0),pct=limit?Math.min(100,(spent/limit)*100):0;return `<div class="weekly-row"><div class="weekly-row-top"><div><div class="weekly-row-name">${escapeHtml(b.category)}</div><div class="weekly-row-meta">${money(spent)} spent · ${money(Math.max(0,limit-spent))} left</div></div><strong>${money(limit)}</strong></div><div class="weekly-track"><div class="weekly-fill ${spent>limit?'over':''}" style="width:${pct}%"></div></div><div class="weekly-actions"><button data-edit-weekly="${b.id}" data-category="${escapeHtml(b.category)}" data-amount="${limit}">Edit</button><button data-delete-weekly="${b.id}">Delete</button></div></div>`}).join(''):'<div class="weekly-empty">No weekly personal budgets yet. Add your first category limit above.</div>'}</div>`;
       panel.querySelector('#weeklySave').onclick=async()=>{const c=panel.querySelector('#weeklyCategory').value,a=panel.querySelector('#weeklyAmount').value;if(!a||Number(a)<=0){alert('Enter a weekly budget amount.');return;}await saveBudget(c,a);await render();};
       panel.querySelectorAll('[data-edit-weekly]').forEach(btn=>btn.onclick=async()=>{const amount=prompt(`Weekly budget for ${btn.dataset.category}`,btn.dataset.amount);if(amount===null)return;if(!amount||Number(amount)<=0)return;await saveBudget(btn.dataset.category,amount);await render();});
       panel.querySelectorAll('[data-delete-weekly]').forEach(btn=>btn.onclick=async()=>{await deleteBudget(btn.dataset.deleteWeekly);await render();});
