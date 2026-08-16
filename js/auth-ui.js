@@ -9,8 +9,22 @@
         heading.textContent = name ? `Good evening, ${name} 👋` : 'Welcome to FinNest 👋';
     }
 
+    function clearSignedOutData() {
+        localStorage.setItem('finnest_expenses', '[]');
+        localStorage.setItem('finnest_incomes', '[]');
+        localStorage.setItem('finnest_budgets', '{}');
+        localStorage.setItem('finnest_family_members', '[]');
+        localStorage.setItem('finnest_family_payers', '{}');
+        localStorage.removeItem('finnest_supabase_id_map');
+        localStorage.removeItem('finnest_profile');
+        localStorage.removeItem('finnest_view_mode');
+        try { window.expenses = []; window.incomes = []; window.budgets = {}; } catch (_) { /* module globals are not window properties */ }
+        if (typeof window.renderDashboard === 'function') window.renderDashboard();
+    }
+
     async function applySession(session) {
         if (!session) {
+            clearSignedOutData();
             setGreeting('');
             return;
         }
