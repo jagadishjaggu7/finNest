@@ -137,14 +137,24 @@
         let section = document.getElementById('finnestIncomeHistory');
         if (!section) { section = document.createElement('section'); section.id = 'finnestIncomeHistory'; section.className = 'dashboard-card finnest-income-history'; budgetSection.insertAdjacentElement('afterend', section); }
         const list = (typeof incomes !== 'undefined' ? [...incomes] : []).sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
-        section.innerHTML = `<div class="card-header"><h2>Income History</h2><span class="muted">Edit any income entry</span></div>${list.length ? list.map(i => `<div class="finnest-income-row"><div><span class="finnest-income-source">${esc(i.source || 'Other income')}</span><span class="finnest-income-date">${esc(typeof formatDate === 'function' ? formatDate(i.date) : i.date)}</span></div><strong class="finnest-income-amount">+${money(i.amount)}</strong><button class="finnest-income-edit" data-edit-income="${esc(i.id)}">Edit</button></div>`).join('') : '<div class="empty-state">No income records yet.</div>'}`;
+        section.innerHTML = `<div class="card-header"><h2>Income History</h2><span class="muted">Edit any income entry</span></div>${list.length ? list.map(i => `<div class="finnest-income-row"><div><span class="finnest-income-source">${esc(i.source || 'Other income')}</span><span class="finnest-income-date">${esc(typeof formatDate === 'function' ? formatDate(i.date) : i.date)}</span></div><strong class="finnest-income-amount">+${money(i.amount)}</strong><button class="finnest-income-edit" data-edit-income="${esc(i.id)}">Edit</button></div>`).join('') : '<div class="empty-state">No income records yet.</div>`;
         section.querySelectorAll('[data-edit-income]').forEach(btn => btn.onclick = () => { const item = incomes.find(i => String(i.id) === String(btn.dataset.editIncome)); if (item) incomeModal(item); });
     }
 
     function installIncomeFix() {
         ensureIncomeHistory();
-        const observer = new MutationObserver(() => { if (document.querySelector('.budget-section')) ensureIncomeHistory(); });
-        observer.observe(document.querySelector('.main-content') || document.body, { childList:true, subtree:true });
+        // IMPORTANT: do not observe the entire subtree here. ensureIncomeHistory()
+        // rewrites section.innerHTML, which itself creates mutations. Observing
+        // that subtree caused an infinite MutationObserver/render loop and froze
+        // the browser UI (including right-click/DevTools responsiveness).
+        const main = document.querySelector('.main-content');
+        if (!main) return;
+        const observer = new MutationObserver(() => {
+            if (document.querySelector('.budget-section') && !document.getElementById('finnestIncomeHistory')) {
+                ensureIncomeHistory();
+            }
+        });
+        observer.observe(main, { childList: true });
     }
 
     function installProfileFix() {
