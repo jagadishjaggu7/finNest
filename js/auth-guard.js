@@ -1,14 +1,6 @@
-/* FinNest auth guard — prevent signed-out users from seeing local demo data. */
+/* FinNest auth guard — signed-out users must never see personal/demo financial data. */
 (function () {
   document.documentElement.classList.add('finnest-auth-pending');
-  const keys = [
-    'finnest_expenses',
-    'finnest_incomes',
-    'finnest_budgets',
-    'finnest_family_members',
-    'finnest_family_payers',
-    'finnest_supabase_id_map'
-  ];
 
   function finish() {
     document.documentElement.classList.remove('finnest-auth-pending');
@@ -20,8 +12,16 @@
       const client = window.finnestSupabase;
       if (!client) return;
       const { data } = await client.auth.getSession();
+
       if (!data?.session) {
-        keys.forEach(key => localStorage.removeItem(key));
+        // Keep explicit empty values so app.js cannot fall back to demo data.
+        localStorage.setItem('finnest_expenses', '[]');
+        localStorage.setItem('finnest_incomes', '[]');
+        localStorage.setItem('finnest_budgets', '{}');
+        localStorage.setItem('finnest_family_members', '[]');
+        localStorage.setItem('finnest_family_payers', '{}');
+        localStorage.removeItem('finnest_supabase_id_map');
+        localStorage.removeItem('finnest_profile');
         localStorage.removeItem('finnest_view_mode');
       }
     } catch (error) {
