@@ -16,6 +16,21 @@
         replacement.addEventListener("click", () => openMoreMenu());
     }
 
+    function navigateToView(viewName) {
+        // app.js keeps currentView in its own lexical scope, so changing
+        // window.currentView does not update the app state. Reuse the
+        // existing desktop navigation handler instead; it updates the
+        // real currentView and calls renderCurrentView().
+        const names = ["Dashboard", "Expenses", "Budgets", "Reports", "Family", "Accounts", "Settings"];
+        const index = names.indexOf(viewName);
+        const navItems = document.querySelectorAll(".sidebar .nav-item");
+        if (index >= 0 && navItems[index]) {
+            navItems[index].click();
+            return true;
+        }
+        return false;
+    }
+
     function openMoreMenu() {
         const existing = document.getElementById("mobileMoreMenu");
         if (existing) {
@@ -61,11 +76,8 @@
 
         menu.querySelectorAll("[data-mobile-view]").forEach(button => {
             button.addEventListener("click", () => {
-                window.currentView = button.dataset.mobileView;
-                if (typeof window.renderCurrentView === "function") {
-                    window.renderCurrentView();
-                }
-                close();
+                const navigated = navigateToView(button.dataset.mobileView);
+                if (navigated) close();
             });
         });
 
