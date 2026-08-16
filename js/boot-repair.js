@@ -1,14 +1,10 @@
-/* FinNest boot repair: make navigation resilient if an earlier optional module fails. */
+/* FinNest boot repair: make navigation resilient if the main DOM boot was interrupted. */
 (function () {
     function run() {
         try {
             if (typeof wireNavigation === 'function' && !document.documentElement.dataset.finnestNavigationRepaired) {
                 document.documentElement.dataset.finnestNavigationRepaired = '1';
                 wireNavigation();
-            }
-            if (typeof setupExpenseSheet === 'function' && !document.documentElement.dataset.finnestExpenseRepaired) {
-                document.documentElement.dataset.finnestExpenseRepaired = '1';
-                setupExpenseSheet();
             }
         } catch (error) {
             console.error('FinNest boot repair failed', error);
