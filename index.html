@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,21 +7,15 @@
     <title>FinNest</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
-
 <body>
-
     <div id="app">
         <header class="app-header">
-            <div class="brand">
-                <div class="brand-logo">₹</div>
-                <span class="brand-name">FinNest</span>
-            </div>
+            <div class="brand"><div class="brand-logo">₹</div><span class="brand-name">FinNest</span></div>
             <div class="header-actions">
                 <button class="icon-button" aria-label="Notifications">🔔</button>
                 <button class="profile-button" aria-label="Profile">J</button>
             </div>
         </header>
-
         <div class="app-layout">
             <aside class="sidebar">
                 <nav class="sidebar-nav">
@@ -35,38 +28,22 @@
                     <button class="nav-item"><span>⚙️</span><span>Settings</span></button>
                 </nav>
             </aside>
-
             <main class="main-content">
-                <section class="page-header">
-                    <div>
-                        <p class="eyebrow">Sunday, 16 August</p>
-                        <h1>Welcome to FinNest 👋</h1>
-                    </div>
-                </section>
-
+                <section class="page-header"><div><p class="eyebrow">Sunday, 16 August</p><h1>Welcome to FinNest 👋</h1></div></section>
                 <section class="summary-grid">
                     <article class="summary-card"><div class="summary-card-top"><span>Available</span><span class="summary-icon">₹</span></div><strong id="totalBalance">₹0</strong><p class="positive">Current month</p></article>
                     <article class="summary-card"><div class="summary-card-top"><span>Income</span><span class="summary-icon income">↓</span></div><strong id="totalIncome">₹0</strong><p class="positive">Current month</p></article>
                     <article class="summary-card"><div class="summary-card-top"><span>Expenses</span><span class="summary-icon expense">↑</span></div><strong id="totalExpenses">₹0</strong><p class="negative">Current month</p></article>
                     <article class="summary-card"><div class="summary-card-top"><span>Savings Rate</span><span class="summary-icon savings">♧</span></div><strong id="savingsRate">0%</strong><p class="positive">Current month</p></article>
                 </section>
-
                 <section class="dashboard-grid">
-                    <article class="dashboard-card expense-overview">
-                        <div class="card-header"><h2>Expense Overview</h2><select><option>This Month</option><option>Last Month</option><option>This Year</option></select></div>
-                        <div class="chart-area"><div class="donut-chart"><div class="donut-center"><strong id="donutTotal">₹0</strong><span>Total</span></div></div><div class="category-list" id="expenseCategoryList"></div></div>
-                        <button class="text-link">View report →</button>
-                    </article>
+                    <article class="dashboard-card expense-overview"><div class="card-header"><h2>Expense Overview</h2><select><option>This Month</option><option>Last Month</option><option>This Year</option></select></div><div class="chart-area"><div class="donut-chart"><div class="donut-center"><strong id="donutTotal">₹0</strong><span>Total</span></div></div><div class="category-list" id="expenseCategoryList"></div></div><button class="text-link">View report →</button></article>
                     <article class="dashboard-card"><div class="card-header"><h2>Recent Transactions</h2><button class="text-link">View All</button></div><div class="transactions" id="recentTransactions"></div></article>
                 </section>
-
                 <section class="dashboard-card budget-section"><div class="card-header"><h2>Budget Overview</h2><button class="text-link">View All Budgets →</button></div><div class="budget-grid"></div></section>
             </main>
-
             <div class="expense-sheet-backdrop" id="expenseSheet">
-                <div class="expense-sheet">
-                    <div class="sheet-handle"></div>
-                    <div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2>Add Expense</h2></div><button class="sheet-close" id="closeExpenseSheet" aria-label="Close">×</button></div>
+                <div class="expense-sheet"><div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2>Add Expense</h2></div><button class="sheet-close" id="closeExpenseSheet" aria-label="Close">×</button></div>
                     <div class="expense-field"><label for="expenseAmount">Amount</label><div class="amount-input-wrapper"><span>₹</span><input type="number" id="expenseAmount" placeholder="0" inputmode="decimal" min="0" step="0.01"></div></div>
                     <div class="expense-field"><label>Category</label><div class="category-chips"><button class="category-chip selected" data-category="Food & Dining">🍴 <span>Food</span></button><button class="category-chip" data-category="Transport">🚗 <span>Transport</span></button><button class="category-chip" data-category="Shopping">🛍️ <span>Shopping</span></button><button class="category-chip" data-category="Bills & Utilities">💡 <span>Bills</span></button><button class="category-chip" data-category="Health">❤️ <span>Health</span></button><button class="category-chip" data-category="Entertainment">🎬 <span>Fun</span></button><button class="category-chip" data-category="Other">••• <span>Other</span></button></div></div>
                     <div class="expense-field"><label for="expenseAccount">Account</label><select id="expenseAccount"><option value="UPI">📱 UPI</option><option value="Bank Account">🏦 Bank Account</option><option value="Cash">💵 Cash</option><option value="Credit Card">💳 Credit Card</option></select></div>
@@ -76,11 +53,9 @@
                     <div class="expense-actions"><button class="cancel-expense" id="cancelExpense">Cancel</button><button class="save-expense" id="saveExpense">Add Expense</button></div>
                 </div>
             </div>
-
             <button class="desktop-add-expense" id="desktopAddExpense" aria-label="Add expense"><span>+</span><span>Add Expense</span></button>
             <nav class="mobile-nav"><button class="mobile-nav-item active"><span>🏠</span><small>Home</small></button><button class="mobile-nav-item"><span>💸</span><small>Expenses</small></button><button class="add-expense-button">+</button><button class="mobile-nav-item"><span>📊</span><small>Reports</small></button><button class="mobile-nav-item" id="mobileFamilyNav"><span>👨‍👩‍👧</span><small>Family</small></button></nav>
         </div>
-
         <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
         <script src="js/supabase-client.js"></script>
         <script src="js/auth-guard.js"></script>
@@ -105,6 +80,7 @@
         <script src="js/feature-router.js"></script>
         <script src="js/view-mode.js"></script>
         <script src="js/family-payer-labels.js"></script>
+        <script src="js/boot-repair.js"></script>
     </div>
 </body>
 </html>
