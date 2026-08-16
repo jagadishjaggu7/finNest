@@ -19,9 +19,19 @@
         return data?.session?.user || null;
     }
 
+    // A user can belong to more than one household. Until FinNest has an
+    // explicit household switch, prefer the household where this user is the owner.
     async function getHouseholdId(userId) {
-        const { data } = await supabase.from('household_members').select('household_id').eq('user_id', userId).limit(1).maybeSingle();
-        return data?.household_id || null;
+        const { data, error } = await supabase
+            .from('household_members')
+            .select('household_id, role, created_at')
+            .eq('user_id', userId)
+            .order('role', { ascending: false })
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        if (!data?.length) return null;
+        const owner = data.find(member => member.role === 'owner');
+        return (owner || data[0]).household_id;
     }
 
     function periodInfo(period) {
