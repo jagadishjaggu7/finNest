@@ -4,7 +4,10 @@
     const supabase = window.finnestSupabase;
 
     const money = value => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value || 0));
-    const dateKey = d => d.toISOString().slice(0, 10);
+    const dateKey = d => {
+        const x = new Date(d);
+        return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    };
     const monthStart = d => { const x = new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; };
     const monday = (d = new Date()) => { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); x.setHours(0,0,0,0); return x; };
     const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
@@ -46,12 +49,12 @@
             .eq('period_start', startKey)
             .order('category');
         if (scope === 'family') budgetQuery = budgetQuery.eq('household_id', householdId || '00000000-0000-0000-0000-000000000000');
-        else budgetQuery = budgetQuery.eq('user_id', user.id);
+        else budgetQuery = budgetQuery.eq('user_id', user.id).is('household_id', null);
 
         let expenseQuery = supabase.from('expenses').select('id,amount,category,expense_date,expense_type,user_id,household_id');
         expenseQuery = expenseQuery.gte('expense_date', startKey).lte('expense_date', endKey);
         if (scope === 'family') expenseQuery = expenseQuery.eq('household_id', householdId || '00000000-0000-0000-0000-000000000000').eq('expense_type','shared');
-        else expenseQuery = expenseQuery.eq('user_id', user.id).eq('expense_type','personal');
+        else expenseQuery = expenseQuery.eq('user_id', user.id).eq('expense_type','personal').is('household_id', null);
 
         const [{ data: budgets, error: budgetError }, { data: expenses, error: expenseError }] = await Promise.all([budgetQuery, expenseQuery]);
         if (budgetError) throw budgetError;
@@ -61,10 +64,7 @@
 
     function notifyBudgetChanged(scope, period) {
         window.dispatchEvent(new CustomEvent('finnest:budget-changed', { detail: { scope, period } }));
-        if (scope === 'family') {
-            const familyButton = document.querySelector('#finnestViewSwitch [data-mode="family"]');
-            if (familyButton) setTimeout(() => familyButton.click(), 50);
-        }
+        if (scope === 'family' && window.FinNestViewMode?.get?.() === 'family') window.FinNestViewMode.refresh().catch(() => {});
     }
 
     async function saveBudget(scope, period, category, amount, existingId = null) {
@@ -90,7 +90,7 @@
             return;
         }
         let query = supabase.from('budgets').select('id').eq('category', category).eq('period_type', period).eq('period_start', startKey).eq('budget_scope', scope).limit(1);
-        query = scope === 'family' ? query.eq('household_id', householdId) : query.eq('user_id', user.id);
+        query = scope === 'family' ? query.eq('household_id', householdId) : query.eq('user_id', user.id).is('household_id', null);
         const { data: existing, error: lookupError } = await query.maybeSingle();
         if (lookupError) throw lookupError;
         if (existing?.id) {
@@ -146,7 +146,7 @@
                 const info = periodInfo(period);
                 host.innerHTML = `<div class="budget-context"><span>${scope==='family'?'👨‍👩‍👧 Shared household budget':'👤 Your personal budget'}</span><strong>${info.label} · ${money(totalSpent)} spent / ${money(totalBudget)} budgeted</strong></div>
                     <div class="budget-editor-row" style="display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:10px;margin-bottom:16px"><select id="scopeCategory">${CATEGORIES.map(c=>`<option>${escapeHtml(c)}</option>`).join('')}</select><input id="scopeAmount" type="number" min="0" step="100" placeholder="₹ limit"><button class="finnest-primary-button" id="scopeAdd">Set Budget</button></div>
-                    <div class="budget-scope-grid">${data.budgets.length ? data.budgets.map(b => { const used = Number(spent[b.category] || 0); const limit = Number(b.amount || 0); const pct = limit ? Math.min(100, used / limit * 100) : 0; const over = used > limit; return `<div class="budget-scope-row"><div><div class="budget-scope-name">${escapeHtml(b.category)}</div><div class="budget-scope-meta">${money(used)} spent · ${over ? 'Over budget' : money(Math.max(0, limit-used)) + ' remaining'}</div></div><input type="number" min="0" step="100" value="${limit}" data-budget-id="${b.id}" data-budget-category="${escapeHtml(b.category)}"><div class="budget-scope-actions"><button data-save-id="${b.id}">Save</button><button class="danger" data-delete-id="${b.id}">Delete</button></div><div style="grid-column:1/-1;height:7px;background:#E2E8F0;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${over?'#EF4444':'#10B981'};border-radius:99px"></div></div></div>`; }).join('') : '<div class="budget-scope-empty">No budgets yet for this scope and period.</div>'}</div>`;
+                    <div class="budget-scope-grid">${data.budgets.length ? data.budgets.map(b => { const used = Number(spent[b.category] || 0); const limit = Number(b.amount || 0); const pct = limit ? Math.min(100, used / limit * 100) : 0; const over = used > limit; return `<div class="budget-scope-row"><div><div class="budget-scope-name">${escapeHtml(b.category)}</div><div class="budget-scope-meta">${money(used)} spent · ${over ? 'Over budget' : money(Math.max(0, limit-used)) + ' remaining'}</div></div><input type="number" min="0" step="100" value="${limit}" data-budget-id="${b.id}" data-budget-category="${escapeHtml(b.category)}"><div class="budget-scope-actions"><button data-save-id="${b.id}">Save</button><button class="danger" data-delete-id="${b.id}">Delete</button></div><div style="grid-column:1/-1;height:7px;background:#E2E8F0;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${over?'#EF4444':'#10B981'};border-radius:99px"></div></div></div>`; }).join('') : '<div class="budget-scope-empty">No budgets yet for this scope and period. Use the controls above to create one.</div>'}</div>`;
                 host.querySelector('#scopeAdd').onclick = async () => { const amount = Number(host.querySelector('#scopeAmount').value); const category = host.querySelector('#scopeCategory').value; if (!amount || amount <= 0) return alert('Enter a valid budget amount.'); try { await saveBudget(scope, period, category, amount); await paint(); } catch (e) { alert(e.message || 'Unable to save budget.'); } };
                 host.querySelectorAll('[data-save-id]').forEach(btn => btn.onclick = async () => { const input = host.querySelector(`[data-budget-id="${btn.dataset.saveId}"]`); try { await saveBudget(scope, period, input.dataset.budgetCategory, Number(input.value), btn.dataset.saveId); await paint(); } catch (e) { alert(e.message || 'Unable to save budget.'); } });
                 host.querySelectorAll('[data-delete-id]').forEach(btn => btn.onclick = async () => { if (!confirm('Delete this budget?')) return; try { await removeBudget(btn.dataset.deleteId); notifyBudgetChanged(scope, period); await paint(); } catch (e) { alert(e.message || 'Unable to delete budget.'); } });
