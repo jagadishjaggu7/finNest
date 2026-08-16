@@ -10,7 +10,12 @@
   async function boot() {
     try {
       const client = window.finnestSupabase;
-      if (!client) return;
+      if (!client) {
+        // Never leave the entire page hidden forever if Supabase/CDN fails to load.
+        // The application can still render an empty, responsive signed-out shell.
+        console.warn('FinNest: Supabase client unavailable; releasing auth gate.');
+        return;
+      }
       const { data } = await client.auth.getSession();
 
       if (!data?.session) {
@@ -34,5 +39,5 @@
   const style = document.createElement('style');
   style.textContent = '.finnest-auth-pending body{visibility:hidden}.finnest-auth-pending body::before{content:"Loading FinNest…";visibility:visible;position:fixed;inset:0;display:grid;place-items:center;background:#F8FAFC;color:#0F172A;font:600 14px system-ui;z-index:99999}.finnest-auth-ready body{visibility:visible}';
   document.head.appendChild(style);
-  boot();
+  boot().finally(finish);
 })();
