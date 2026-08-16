@@ -61,8 +61,6 @@
 
     function notifyBudgetChanged(scope, period) {
         window.dispatchEvent(new CustomEvent('finnest:budget-changed', { detail: { scope, period } }));
-        // The global Family View owns the summary card/cache. Re-run its Family mode
-        // handler so the summary immediately reflects a newly saved budget.
         if (scope === 'family') {
             const familyButton = document.querySelector('#finnestViewSwitch [data-mode="family"]');
             if (familyButton) setTimeout(() => familyButton.click(), 50);
@@ -118,6 +116,7 @@
             .budget-scope-toolbar button{border:0;background:transparent;color:#64748B;padding:9px 14px;border-radius:9px;font-weight:700;cursor:pointer}.budget-scope-toolbar button.active{background:#fff;color:#047857;box-shadow:0 1px 4px #CBD5E1}
             .budget-period{display:flex;gap:8px;margin-bottom:18px}.budget-period button{border:1px solid #D1FAE5;background:#fff;color:#047857;border-radius:9px;padding:8px 12px;font-weight:700;cursor:pointer}.budget-period button.active{background:#10B981;color:#fff}
             .budget-context{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:#ECFDF5;color:#065F46;font-size:12px}.budget-context strong{font-size:13px}.budget-scope-grid{display:grid;gap:10px}.budget-scope-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 110px;align-items:center;gap:12px;padding:13px;border:1px solid #E2E8F0;border-radius:12px;background:#fff}.budget-scope-row input{width:100%;padding:9px 10px;border:1px solid #CBD5E1;border-radius:9px;font:inherit}.budget-scope-name{font-weight:700;color:#334155}.budget-scope-meta{font-size:11px;color:#64748B;margin-top:3px}.budget-scope-actions{display:flex;gap:6px;justify-content:flex-end}.budget-scope-actions button{border:0;background:#F1F5F9;color:#475569;border-radius:8px;padding:7px 9px;font-size:11px;cursor:pointer}.budget-scope-actions .danger{color:#B91C1C}.budget-scope-empty{padding:24px;text-align:center;color:#64748B;border:1px dashed #CBD5E1;border-radius:12px}
+            .family-view .weekly-budget-panel{display:none!important}
             @media(max-width:700px){.budget-scope-toolbar{width:100%}.budget-scope-toolbar button{flex:1}.budget-scope-row{grid-template-columns:1fr 120px}.budget-scope-actions{grid-column:1/-1;justify-content:flex-start}.budget-period{width:100%}.budget-period button{flex:1}}
         `; document.head.appendChild(s);
     }
