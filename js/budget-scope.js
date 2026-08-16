@@ -75,9 +75,22 @@
             budget_scope: scope,
             household_id: householdId
         };
-        if (existingId) row.id = existingId;
-        const { error } = await supabase.from('budgets').upsert(row, { onConflict: scope === 'family' ? 'household_id,category,period_type,period_start' : 'user_id,category,period_type,period_start' });
-        if (error) throw error;
+        if (existingId) {
+            const { error } = await supabase.from('budgets').update({ amount: Number(amount) }).eq('id', existingId);
+            if (error) throw error;
+            return;
+        }
+        let query = supabase.from('budgets').select('id').eq('category', category).eq('period_type', period).eq('period_start', startKey).eq('budget_scope', scope).limit(1);
+        query = scope === 'family' ? query.eq('household_id', householdId) : query.eq('user_id', user.id);
+        const { data: existing, error: lookupError } = await query.maybeSingle();
+        if (lookupError) throw lookupError;
+        if (existing?.id) {
+            const { error } = await supabase.from('budgets').update({ amount: Number(amount) }).eq('id', existing.id);
+            if (error) throw error;
+        } else {
+            const { error } = await supabase.from('budgets').insert(row);
+            if (error) throw error;
+        }
     }
 
     async function removeBudget(id) {
@@ -117,7 +130,6 @@
             try {
                 const data = await load(scope, period);
                 const spent = {}; data.expenses.forEach(e => spent[e.category] = (spent[e.category] || 0) + Number(e.amount || 0));
-                const byCategory = Object.fromEntries(data.budgets.map(b => [b.category, b]));
                 const totalBudget = data.budgets.reduce((s,b) => s + Number(b.amount || 0), 0);
                 const totalSpent = Object.values(spent).reduce((s,v) => s + v, 0);
                 const info = periodInfo(period);
