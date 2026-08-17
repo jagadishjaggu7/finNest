@@ -29,7 +29,6 @@ with check (
         select 1 from public.expenses e
         where e.id = expense_id
           and e.user_id = (select auth.uid())
-          and e.household_id = household_id
           and e.expense_type = 'shared'
     )
 );
