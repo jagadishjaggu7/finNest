@@ -11,8 +11,6 @@
         const user = sessionData?.session?.user;
         if (!user) return { user: null, members: [], household: null };
 
-        // A user can belong to more than one household. Never use limit(1),
-        // because membership creation order is not a reliable household selector.
         const { data: memberships, error: membershipError } = await supabase
             .from('household_members')
             .select('id,household_id,user_id,display_name,role,created_at,households(id,name,owner_id)')
@@ -62,8 +60,6 @@
         button.disabled = true;
         button.textContent = 'Saving…';
         try {
-            // Update the household member first. RLS permits this only for the
-            // household owner, which is the intended authority for nicknames.
             const { error: memberError } = await supabase
                 .from('household_members')
                 .update({ display_name: value })
@@ -72,12 +68,13 @@
             if (memberError) throw memberError;
 
             if (member.user_id === user.id) {
-                // Keep all identity sources aligned so a refresh/login cannot
-                // fall back to the old auth metadata or local prototype name.
+                // Upsert instead of update: a newly-created auth user may not yet
+                // have a profiles row. An UPDATE with zero matching rows returns
+                // no error, which previously made the nickname appear saved until
+                // the next refresh, when auth-ui fell back to the email name.
                 const { error: profileError } = await supabase
                     .from('profiles')
-                    .update({ display_name: value })
-                    .eq('id', user.id);
+                    .upsert({ id: user.id, display_name: value, currency: 'INR (₹)' }, { onConflict: 'id' });
                 if (profileError) throw profileError;
 
                 const { error: authError } = await supabase.auth.updateUser({
