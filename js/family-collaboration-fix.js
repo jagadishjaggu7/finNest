@@ -132,19 +132,15 @@
         localSnapshot();
         window.dispatchEvent(new CustomEvent('finnest:family-data-ready'));
 
-        if (typeof renderDashboard === 'function') renderDashboard();
         if (typeof currentView !== 'undefined' && currentView === 'Family' && typeof renderFamilyView === 'function') renderFamilyView();
-        if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') renderExpensesView();
+        else if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') renderExpensesView();
+        else if (typeof renderDashboard === 'function') renderDashboard();
     }
 
     function selectedPayerId() {
         return window.FinNestSharedExpense?.getPayerId?.()
             || document.getElementById('expensePayer')?.value
             || null;
-    }
-
-    function selectedPayerName(payerId) {
-        return memberName(payerId) || context.user?.id === payerId ? 'Me' : '';
     }
 
     function enforcePayerDisplay(expense) {
@@ -201,6 +197,9 @@
             else delete familyPayers[target.id];
 
             localSnapshot();
+            if (typeof renderCurrentView === 'function') renderCurrentView();
+            else if (typeof renderDashboard === 'function') renderDashboard();
+
             setTimeout(() => {
                 window.FinNestCloud?.syncAll?.();
                 hydrateSharedTransactions().catch(error => console.warn('FinNest shared transaction refresh failed', error));
