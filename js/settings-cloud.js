@@ -1,4 +1,4 @@
-/* FinNest Settings — render household member names from Supabase instead of demo defaults. */
+/* FinNest Settings — cloud-backed family names with deterministic household selection. */
 (function () {
     const supabase = window.finnestSupabase;
     if (!supabase) return;
@@ -6,18 +6,22 @@
     const esc = value => String(value ?? '').replace(/[&<>\"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;', "'":'&#39;' }[c]));
 
     async function getContext() {
-        const { data: sessionData } = await supabase.auth.getSession();
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
         const user = sessionData?.session?.user;
         if (!user) return { user: null, members: [], household: null };
 
-        const { data: membership, error: membershipError } = await supabase
+        // A user can belong to more than one household. Never use limit(1),
+        // because membership creation order is not a reliable household selector.
+        const { data: memberships, error: membershipError } = await supabase
             .from('household_members')
             .select('id,household_id,user_id,display_name,role,created_at,households(id,name,owner_id)')
             .eq('user_id', user.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
+            .order('created_at', { ascending: true });
         if (membershipError) throw membershipError;
+
+        const owned = (memberships || []).find(m => m.households?.owner_id === user.id);
+        const membership = owned || memberships?.[0];
         if (!membership?.household_id) return { user, members: [], household: null };
 
         const { data: members, error: membersError } = await supabase
@@ -58,18 +62,40 @@
         button.disabled = true;
         button.textContent = 'Saving…';
         try {
-            const { error } = await supabase.from('household_members').update({ display_name: value }).eq('id', member.id);
-            if (error) throw error;
+            // Update the household member first. RLS permits this only for the
+            // household owner, which is the intended authority for nicknames.
+            const { error: memberError } = await supabase
+                .from('household_members')
+                .update({ display_name: value })
+                .eq('id', member.id)
+                .eq('household_id', context.household.id);
+            if (memberError) throw memberError;
 
             if (member.user_id === user.id) {
-                const { error: profileError } = await supabase.from('profiles').update({ display_name: value }).eq('id', user.id);
+                // Keep all identity sources aligned so a refresh/login cannot
+                // fall back to the old auth metadata or local prototype name.
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({ display_name: value })
+                    .eq('id', user.id);
                 if (profileError) throw profileError;
-                localStorage.setItem('finnest_profile', JSON.stringify({ name: value, email: user.email || '', currency: 'INR (₹)' }));
+
+                const { error: authError } = await supabase.auth.updateUser({
+                    data: { display_name: value }
+                });
+                if (authError) throw authError;
+
+                localStorage.setItem('finnest_profile', JSON.stringify({
+                    name: value,
+                    email: user.email || '',
+                    currency: 'INR (₹)'
+                }));
             }
 
             const names = context.members.map(m => m.id === member.id ? value : (m.display_name || 'Member'));
             localStorage.setItem('finnest_family_members', JSON.stringify(names));
             window.dispatchEvent(new CustomEvent('finnest:family-members-changed'));
+            window.dispatchEvent(new CustomEvent('finnest:profile-changed', { detail: { name: value } }));
             alert('Family member updated.');
         } catch (error) {
             alert(error?.message || 'Unable to update family member.');
