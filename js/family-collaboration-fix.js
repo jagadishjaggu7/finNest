@@ -219,7 +219,6 @@
         originalRenderFamilyView = renderFamilyView;
         renderFamilyView = function () {
             originalRenderFamilyView();
-            setTimeout(() => hydrateSharedTransactions().catch(() => {}), 0);
         };
     }
 
