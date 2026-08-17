@@ -1,8 +1,8 @@
-/* FinNest header actions — zero-cost local prototype
-   Profile + notifications. Supabase can replace this later. */
+/* FinNest header actions — cloud-backed profile + notifications. */
 (function () {
     const PROFILE_KEY = "finnest_profile";
     const READ_KEY = "finnest_read_notifications";
+    const supabase = window.finnestSupabase;
 
     function loadJson(key, fallback) {
         try {
@@ -14,11 +14,54 @@
     }
 
     function getProfile() {
-        return loadJson(PROFILE_KEY, { name: "Jaggu", email: "", currency: "INR (₹)" });
+        return loadJson(PROFILE_KEY, { name: "", email: "", currency: "INR (₹)" });
     }
 
-    function saveProfile(profile) {
+    function saveLocalProfile(profile) {
         localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    }
+
+    async function getAuthenticatedUser() {
+        if (!supabase) return null;
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        return data?.session?.user || null;
+    }
+
+    async function loadCloudProfile(user) {
+        if (!supabase || !user) return null;
+        const { data, error } = await supabase
+            .from("profiles")
+            .select("display_name,currency")
+            .eq("id", user.id)
+            .maybeSingle();
+        if (error) throw error;
+        if (!data?.display_name) return null;
+        return {
+            name: data.display_name,
+            email: user.email || "",
+            currency: data.currency || "INR (₹)"
+        };
+    }
+
+    async function saveCloudProfile(profile) {
+        if (!supabase) return;
+        const user = await getAuthenticatedUser();
+        if (!user) throw new Error("Please sign in before saving your profile.");
+
+        const { error: profileError } = await supabase
+            .from("profiles")
+            .upsert({
+                id: user.id,
+                display_name: profile.name,
+                currency: profile.currency || "INR (₹)"
+            }, { onConflict: "id" });
+        if (profileError) throw profileError;
+
+        const { error: authError } = await supabase.auth.updateUser({
+            data: { display_name: profile.name }
+        });
+        if (authError) throw authError;
     }
 
     function getExpenses() {
@@ -44,12 +87,10 @@
         const expenses = getExpenses().filter(e => String(e.date || "").slice(0, 7) === currentMonth());
         const budgets = getBudgets();
         const totals = {};
-
         expenses.forEach(e => {
             const category = e.category || "Other";
             totals[category] = (totals[category] || 0) + Number(e.amount || 0);
         });
-
         const notifications = [];
         Object.entries(budgets).forEach(([category, limit]) => {
             const spent = totals[category] || 0;
@@ -62,10 +103,7 @@
                 notifications.push({ id: `near-${category}`, icon: "⚠️", title: `${category} is near its budget`, text: `${Math.round(ratio * 100)}% of the monthly limit used.`, level: "warning" });
             }
         });
-
-        if (!notifications.length) {
-            notifications.push({ id: "all-good", icon: "✅", title: "You're all caught up", text: "No budget alerts for this month.", level: "success" });
-        }
+        if (!notifications.length) notifications.push({ id: "all-good", icon: "✅", title: "You're all caught up", text: "No budget alerts for this month.", level: "success" });
         return notifications;
     }
 
@@ -116,8 +154,21 @@
         return { backdrop, close };
     }
 
-    function openProfile() {
-        const profile = getProfile();
+    async function openProfile() {
+        let profile = getProfile();
+        try {
+            const user = await getAuthenticatedUser();
+            const cloudProfile = await loadCloudProfile(user);
+            if (cloudProfile) {
+                profile = cloudProfile;
+                saveLocalProfile(profile);
+            } else if (user?.user_metadata?.display_name) {
+                profile = { name: user.user_metadata.display_name, email: user.email || "", currency: "INR (₹)" };
+            }
+        } catch (error) {
+            console.warn("FinNest profile load failed", error);
+        }
+
         const initials = (profile.name || "J").trim().charAt(0).toUpperCase();
         const { backdrop, close } = openPopover(`
             <div class="finnest-popover-head"><div><p class="eyebrow">FinNest</p><h2>Profile</h2></div><button class="finnest-popover-close" aria-label="Close">×</button></div>
@@ -128,14 +179,27 @@
             <div class="finnest-popover-actions"><button class="finnest-cancel">Cancel</button><button class="finnest-save">Save Profile</button></div>
         `);
         backdrop.querySelector(".finnest-cancel").onclick = close;
-        backdrop.querySelector(".finnest-save").onclick = () => {
+        backdrop.querySelector(".finnest-save").onclick = async () => {
+            const button = backdrop.querySelector(".finnest-save");
             const name = backdrop.querySelector("#profileName").value.trim();
             if (!name) return alert("Please enter your name.");
-            saveProfile({ name, email: backdrop.querySelector("#profileEmail").value.trim(), currency: backdrop.querySelector("#profileCurrency").value });
-            document.querySelector(".profile-button")?.replaceChildren(document.createTextNode(name.charAt(0).toUpperCase()));
-            const heading = document.querySelector(".page-header h1");
-            if (heading) heading.textContent = `${getGreeting()}, ${name} 👋`;
-            close();
+            const updated = { name, email: backdrop.querySelector("#profileEmail").value.trim(), currency: backdrop.querySelector("#profileCurrency").value };
+            button.disabled = true;
+            button.textContent = "Saving…";
+            try {
+                await saveCloudProfile(updated);
+                saveLocalProfile(updated);
+                document.querySelector(".profile-button")?.replaceChildren(document.createTextNode(name.charAt(0).toUpperCase()));
+                const heading = document.querySelector(".page-header h1");
+                if (heading) heading.textContent = `${getGreeting()}, ${name} 👋`;
+                window.dispatchEvent(new CustomEvent("finnest:profile-changed", { detail: updated }));
+                close();
+            } catch (error) {
+                alert(error?.message || "Unable to save your profile. Please try again.");
+            } finally {
+                button.disabled = false;
+                button.textContent = "Save Profile";
+            }
         };
     }
 
@@ -146,7 +210,7 @@
 
     function openNotifications() {
         const notifications = getNotifications();
-        const { backdrop, close } = openPopover(`
+        const { backdrop } = openPopover(`
             <div class="finnest-popover-head"><div><p class="eyebrow">FinNest</p><h2>Notifications</h2></div><button class="finnest-popover-close" aria-label="Close">×</button></div>
             <div>${notifications.map(n => `<div class="finnest-notification ${n.level}"><div class="finnest-notification-icon">${n.icon}</div><div><strong>${escapeHtml(n.title)}</strong><span>${escapeHtml(n.text)}</span></div></div>`).join("")}</div>
         `);
@@ -161,7 +225,7 @@
         const button = document.querySelector(".profile-button");
         if (button) button.textContent = (profile.name || "J").trim().charAt(0).toUpperCase();
         const heading = document.querySelector(".page-header h1");
-        if (heading && /Good (morning|afternoon|evening),/.test(heading.textContent)) heading.textContent = `${getGreeting()}, ${profile.name || "Jaggu"} 👋`;
+        if (heading && /Good (morning|afternoon|evening),/.test(heading.textContent)) heading.textContent = `${getGreeting()}, ${profile.name || ""} 👋`;
     }
 
     function updateNotificationDot() {
@@ -169,17 +233,15 @@
         if (!button) return;
         const notifications = getNotifications();
         const read = loadJson(READ_KEY, []);
-        if (notifications.some(n => !read.includes(n.id))) {
-            if (!button.querySelector(".finnest-unread-dot")) {
-                const dot = document.createElement("span");
-                dot.className = "finnest-unread-dot";
-                button.style.position = "relative";
-                button.appendChild(dot);
-            }
+        if (notifications.some(n => !read.includes(n.id)) && !button.querySelector(".finnest-unread-dot")) {
+            const dot = document.createElement("span");
+            dot.className = "finnest-unread-dot";
+            button.style.position = "relative";
+            button.appendChild(dot);
         }
     }
 
-    function init() {
+    async function init() {
         injectStyles();
         const profileButton = document.querySelector(".profile-button");
         const notificationButton = document.querySelector(".icon-button");
@@ -187,6 +249,19 @@
         notificationButton?.addEventListener("click", openNotifications);
         updateHeaderFromProfile();
         updateNotificationDot();
+        try {
+            const user = await getAuthenticatedUser();
+            const cloudProfile = await loadCloudProfile(user);
+            if (cloudProfile) {
+                saveLocalProfile(cloudProfile);
+                updateHeaderFromProfile();
+            } else if (user?.user_metadata?.display_name) {
+                saveLocalProfile({ name: user.user_metadata.display_name, email: user.email || "", currency: "INR (₹)" });
+                updateHeaderFromProfile();
+            }
+        } catch (error) {
+            console.warn("FinNest cloud profile bootstrap failed", error);
+        }
     }
 
     document.addEventListener("DOMContentLoaded", init);
