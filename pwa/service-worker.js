@@ -1,4 +1,4 @@
-const CACHE_NAME = "finnest-v7";
+const CACHE_NAME = "finnest-v8";
 
 const APP_SHELL = [
     "./",
@@ -8,7 +8,6 @@ const APP_SHELL = [
     "./js/app.js",
     "./js/auth-data-gate.js",
     "./js/runtime-safety.js",
-    "./js/shared-expense-splits.js",
     "./pwa/manifest.json"
 ];
 
