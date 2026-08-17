@@ -65,6 +65,45 @@
         window.finnestAuthUser = user;
     }
 
+    // Keep the Family page's local prototype view in sync with the real
+    // Supabase payer. The Family page still reads familyPayers[localExpenseId].
+    // Older shared expenses may already have a cloud payer but no local payer map.
+    async function hydrateLocalPayers() {
+        try {
+            const user = await getUser();
+            if (!user || typeof familyPayers === 'undefined') return;
+
+            const { data: rows, error } = await supabase
+                .from('expenses')
+                .select('id,paid_by_member_id,expense_type')
+                .eq('user_id', user.id)
+                .eq('expense_type', 'shared')
+                .not('paid_by_member_id', 'is', null);
+            if (error) throw error;
+
+            let map = {};
+            try { map = JSON.parse(localStorage.getItem('finnest_supabase_id_map') || '{}'); } catch (_) {}
+            const expenseMap = map.expenses || {};
+            const reverseMap = Object.fromEntries(Object.entries(expenseMap).map(([localId, cloudId]) => [cloudId, localId]));
+            const memberNames = Object.fromEntries(members.map(m => [m.id, m.display_name]));
+            let changed = false;
+
+            (rows || []).forEach(row => {
+                const localId = reverseMap[row.id];
+                const payerName = memberNames[row.paid_by_member_id];
+                if (!localId || !payerName) return;
+                if (familyPayers[localId] !== payerName) {
+                    familyPayers[localId] = payerName;
+                    changed = true;
+                }
+            });
+
+            if (changed) localStorage.setItem('finnest_family_payers', JSON.stringify(familyPayers));
+        } catch (error) {
+            console.warn('FinNest could not hydrate local shared payer names', error);
+        }
+    }
+
     function setTypeSelection(type) {
         document.querySelectorAll('.type-option').forEach(option => {
             option.classList.toggle('selected', option.dataset.type === type);
@@ -76,8 +115,6 @@
         const existing = document.getElementById('expensePayerField');
         if (existing) return existing;
 
-        // The type container has changed across prototype versions. Prefer the
-        // dedicated wrapper, but fall back to the actual Personal/Shared button.
         const typeField = document.querySelector('.expense-type-toggle')?.closest('.expense-field')
             || document.querySelector('.type-option')?.closest('.expense-field')
             || document.querySelector('.type-option')?.parentElement?.closest('.expense-field')
@@ -98,7 +135,7 @@
 
         const userId = window.finnestAuthUser?.id;
         const membersHtml = members.length
-            ? `<label>Who shares this expense?</label><div class="shared-members">${members.map(m => `<label class="shared-member"><input type="checkbox" value="${escapeHtml(m.id)}" ${selectedMemberIds.has(m.id) ? 'checked' : ''}> <span>${escapeHtml(m.display_name || 'Family member')}${m.user_id === userId ? ' · Me' : ''}</span></label>`).join('')}</div>`
+            ? `<label>Who shares this expense?</label><div class="shared-members">${members.map(m => `<label class="shared-member"><input type="checkbox" value="${escapeHtml(m.id)}" ${selectedMemberIds.has(m.id) ? 'checked' : ''}> <span>${escapeHtml(m.display_name || 'Family member')}${m.user_id === userId ? ' · Me' : ''}</span></label>`).join('')}`
             : `<div class="shared-help">No family members are available yet. Add members from Family.</div>`;
 
         const payerHtml = members.length
@@ -144,8 +181,6 @@
             return;
         }
 
-        // Render immediately with the current household state. Then refresh the
-        // members from Supabase and render again when they are available.
         showForType('shared');
         try {
             await loadMembers();
@@ -153,8 +188,7 @@
         } catch (error) {
             console.warn('FinNest could not load family members', error);
             renderField();
-            const field = document.getElementById('expensePayerField');
-            field?.classList.add('shared-visible');
+            document.getElementById('expensePayerField')?.classList.add('shared-visible');
         }
     }
 
@@ -188,10 +222,12 @@
             if (error) throw error;
             const expense = rows?.[0];
             if (!expense?.id || !expense.household_id) return;
+
             if (payerId) {
                 const { error: payerError } = await supabase.from('expenses').update({ paid_by_member_id: payerId }).eq('id', expense.id).eq('user_id', user.id);
                 if (payerError) throw payerError;
             }
+
             const memberIds = [...selectedMemberIds].filter(id => members.some(m => m.id === id));
             if (!memberIds.length) return;
             const { error: deleteError } = await supabase.from('expense_splits').delete().eq('expense_id', expense.id);
@@ -206,6 +242,8 @@
             }));
             const { error: splitError } = await supabase.from('expense_splits').insert(splitRows);
             if (splitError) throw splitError;
+
+            await hydrateLocalPayers();
         } catch (error) {
             console.warn('FinNest shared payer sync failed', error);
         }
@@ -225,6 +263,7 @@
 
         try {
             await loadMembers();
+            await hydrateLocalPayers();
             renderField();
         } catch (error) {
             console.warn('FinNest family members unavailable', error);
@@ -234,6 +273,7 @@
         document.addEventListener('finnest:authenticated', async () => {
             try {
                 await loadMembers();
+                await hydrateLocalPayers();
                 renderField();
                 if (currentType() === 'shared') showForType('shared');
             } catch (error) {
@@ -243,7 +283,7 @@
     }
 
     window.FinNestSharedExpense = {
-        reload: async () => { await loadMembers(); renderField(); },
+        reload: async () => { await loadMembers(); await hydrateLocalPayers(); renderField(); },
         showForType,
         getPayerId: () => payerId
     };
