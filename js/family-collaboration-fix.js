@@ -166,7 +166,13 @@
             const type = expense?.type || document.querySelector('.type-option.selected')?.dataset.type || 'personal';
             if (type === 'shared') {
                 window.FinNestSharedExpense?.showForType?.('shared');
-                if (expense?.paidByMemberId) enforcePayerDisplay(expense);
+                if (expense?.paidByMemberId) {
+                    enforcePayerDisplay(expense);
+                } else if (!expense) {
+                    window.FinNestSharedExpense?.reload?.()
+                        .then(() => window.FinNestSharedExpense?.showForType?.('shared'))
+                        .catch(() => {});
+                }
             } else {
                 window.FinNestSharedExpense?.showForType?.('personal');
             }
