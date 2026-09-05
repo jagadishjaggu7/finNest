@@ -55,15 +55,25 @@
         const user = await currentUser();
         if (!user) throw new Error("Please sign in first.");
         if (!id) throw new Error("Income ID is required.");
+
         const map = idMap();
         const uuid = map.incomes?.[id];
-        if (!uuid) throw new Error("Income not found or not editable.");
-        const { data, error } = await client().from("incomes").delete().eq("id", uuid).eq("user_id", user.id).select("id").maybeSingle();
+        if (!uuid) throw new Error("Income mapping is missing for this record.");
+
+        // Do not request the deleted row back. Some Supabase RLS policies permit
+        // DELETE but prevent SELECT/returning rows, which made a successful delete
+        // look like "Income not found or not editable" to the UI.
+        const { error } = await client()
+            .from("incomes")
+            .delete()
+            .eq("id", uuid)
+            .eq("user_id", user.id);
+
         if (error) throw error;
-        if (!data) throw new Error("Income not found or not editable.");
+
         delete map.incomes[id];
         saveMap(map);
-        return data;
+        return { id };
     }
 
     window.FinNestIncomeService = { save, remove };
