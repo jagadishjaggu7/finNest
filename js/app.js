@@ -132,12 +132,13 @@ function renderDashboard() {
     setText("savingsRate", `${totals.savingsRate.toFixed(1)}%`);
 
     renderMonthComparison(currentExpenses, currentIncomes);
-    renderRecentTransactions();
     renderExpenseOverview(currentExpenses);
-    renderBudgetOverview(currentExpenses);
+    renderRecentTransactions();
     renderRecentIncomes();
+    renderBudgetOverview(currentExpenses);
     updateDashboardDate();
     ensureDashboardActions();
+    bindDashboardLinks();
 }
 
 function setText(id, value) {
@@ -178,6 +179,71 @@ function renderMonthComparison(currentExpenses, currentIncomes) {
 function updateDashboardDate() {
     const eyebrow = document.querySelector(".page-header .eyebrow");
     if (eyebrow) eyebrow.textContent = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long" });
+}
+
+function renderExpenseOverview(sourceExpenses) {
+    const container = document.getElementById("expenseCategoryList");
+    const donutTotal = document.getElementById("donutTotal");
+    const chart = document.querySelector(".donut-chart");
+    const data = categoryTotals(sourceExpenses || []);
+    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
+
+    if (donutTotal) donutTotal.textContent = formatCurrency(total);
+    if (container) {
+        if (!entries.length) {
+            container.innerHTML = `<div class="empty-state">No expenses for this month.</div>`;
+        } else {
+            container.innerHTML = entries.map(([category, amount]) => `
+                <div class="category-row">
+                    <span><i class="category-dot" style="background:${getCategoryColor(category)}"></i>${escapeHtml(category)}</span>
+                    <strong>${formatCurrency(amount)}</strong>
+                </div>
+            `).join("");
+        }
+    }
+
+    if (chart) {
+        if (!entries.length || total <= 0) {
+            chart.style.setProperty("--donut-gradient", "conic-gradient(#E2E8F0 0deg 360deg)");
+        } else {
+            let start = 0;
+            const segments = entries.map(([category, amount]) => {
+                const degrees = Number(amount) / total * 360;
+                const end = start + degrees;
+                const segment = `${getCategoryColor(category)} ${start}deg ${end}deg`;
+                start = end;
+                return segment;
+            });
+            chart.style.setProperty("--donut-gradient", `conic-gradient(${segments.join(", ")})`);
+        }
+    }
+}
+
+function renderBudgetOverview(currentExpenses) {
+    const container = document.querySelector(".budget-grid");
+    if (!container) return;
+
+    const data = budgets && typeof budgets === "object" && !Array.isArray(budgets) ? budgets : {};
+    const spent = categoryTotals(currentExpenses || []);
+    const entries = Object.entries(data);
+
+    if (!entries.length) {
+        container.innerHTML = `<div class="empty-state">No personal monthly budgets set yet.</div>`;
+        return;
+    }
+
+    container.innerHTML = entries.map(([category, limit]) => {
+        const used = Number(spent[category] || 0);
+        const budget = Number(limit || 0);
+        const pct = budget > 0 ? Math.min(100, used / budget * 100) : 0;
+        return `<div class="budget-card">
+            <div class="budget-title"><span>${getCategoryIcon(category)}</span>${escapeHtml(category)}</div>
+            <div class="budget-values">${formatCurrency(used)} spent · ${formatCurrency(budget)} budget</div>
+            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <small>${pct.toFixed(0)}% used</small>
+        </div>`;
+    }).join("");
 }
 
 function renderRecentTransactions() {
@@ -226,16 +292,23 @@ function renderRecentIncomes() {
 }
 
 function ensureDashboardActions() {
-    const pageHeader = document.querySelector(".page-header");
-    if (!pageHeader) return;
-    const button = pageHeader.querySelector("#dashboardIncomeBtn");
+    const button = document.getElementById("dashboardIncomeBtn");
     if (!button) return;
-    button.onclick = null;
-    button.onclick = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        openIncomeModal();
-    };
+    button.onclick = openIncomeModal;
+}
+
+function bindDashboardLinks() {
+    document.getElementById("viewAllIncome")?.addEventListener("click", () => {
+        const first = incomes[0];
+        if (first) openEditIncomeModal(first.id);
+    });
+    document.getElementById("viewAllTransactions")?.addEventListener("click", () => {
+        currentView = "Expenses";
+        renderCurrentView();
+    });
+    document.getElementById("viewAllBudgets")?.addEventListener("click", () => {
+        if (typeof window.renderBudgetsView === "function") window.renderBudgetsView();
+    });
 }
 
 function openIncomeModal(mode = "add", income = null) {
@@ -255,7 +328,13 @@ function openIncomeModal(mode = "add", income = null) {
     </div>`;
     document.body.appendChild(modal);
     document.body.style.overflow = "hidden";
-    const close = () => { modal.remove(); document.body.style.overflow = ""; editingIncomeId = null; };
+
+    const close = () => {
+        modal.remove();
+        document.body.style.overflow = "";
+        editingIncomeId = null;
+    };
+
     modal.querySelector("#closeIncome").onclick = close;
     modal.querySelector("#closeIncome2").onclick = close;
     modal.onclick = event => { if (event.target === modal) close(); };
@@ -267,6 +346,7 @@ function openIncomeModal(mode = "add", income = null) {
         const date = modal.querySelector("#incomeDate").value || todayString();
         const localId = editingIncomeId || Date.now();
         const shouldUpdate = Boolean(editingIncomeId);
+
         try {
             const saved = await window.FinNestIncomeService?.save({ amount, source, date, id: shouldUpdate ? localId : null });
             if (!saved) throw new Error("Income service is unavailable. Please refresh and try again.");
@@ -302,6 +382,7 @@ function openIncomeModal(mode = "add", income = null) {
             alert(error?.message || "Income could not be deleted. Please try again.");
         }
     });
+
     setTimeout(() => modal.querySelector("#incomeAmount")?.focus(), 100);
 }
 
@@ -336,10 +417,14 @@ function openExpenseSheet(mode = "add", expense = null) {
         selectChip(".category-chip", "data-category", expense.category);
         selectChip(".type-option", "data-type", expense.type);
         document.getElementById("expensePayer").value = familyPayers[expense.id] || familyMembers[0];
+        const payerField = document.getElementById("expensePayerField");
+        if (payerField) payerField.style.display = expense.type === "shared" ? "block" : "none";
     } else {
         resetExpenseForm();
         document.getElementById("expenseDate").value = todayString();
         document.getElementById("expensePayer").value = familyMembers[0];
+        const payerField = document.getElementById("expensePayerField");
+        if (payerField) payerField.style.display = "none";
     }
     ensureDeleteButton();
     document.getElementById("deleteExpenseButton").style.display = editingExpenseId ? "block" : "none";
