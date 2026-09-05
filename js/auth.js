@@ -5,6 +5,10 @@
     const supabase = window.finnestSupabase;
     if (!supabase) return;
 
+    function getAppUrl() {
+        return window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+    }
+
     function injectStyles() {
         if (document.getElementById("finnestAuthStyles")) return;
         const style = document.createElement("style");
@@ -74,10 +78,14 @@
                     if (error) throw error;
                     close();
                 } else {
+                    const redirectTo = getAppUrl();
                     const { data, error } = await supabase.auth.signUp({
                         email,
                         password,
-                        options: { data: { display_name: email.split("@")[0] } }
+                        options: {
+                            data: { display_name: email.split("@")[0] },
+                            emailRedirectTo: redirectTo
+                        }
                     });
                     if (error) throw error;
                     if (data.session) {
@@ -90,7 +98,15 @@
                     }
                 }
             } catch (error) {
-                showMessage(error?.message || "Authentication failed. Please try again.", "error");
+                const raw = String(error?.message || "Authentication failed. Please try again.");
+                const normalized = raw.toLowerCase();
+                if (mode === "signup" && (normalized.includes("already registered") || normalized.includes("already exists") || normalized.includes("user already") || normalized.includes("duplicate"))) {
+                    showMessage("An account with this email already exists. Please sign in instead.", "error");
+                } else if (normalized.includes("redirect") || normalized.includes("url")) {
+                    showMessage(`${raw} Please check Supabase Authentication → URL Configuration.`, "error");
+                } else {
+                    showMessage(raw, "error");
+                }
                 button.disabled = false;
                 button.textContent = mode === "signin" ? "Sign in" : "Create account";
             }
