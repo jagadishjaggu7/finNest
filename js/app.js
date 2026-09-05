@@ -228,44 +228,6 @@ function renderRecentIncomes() {
     });
 }
 
-function renderExpenseOverview(source = monthExpenses(currentMonthKey())) {
-    const totalExpenses = source.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    setText("donutTotal", formatCurrency(totalExpenses));
-    const totals = categoryTotals(source);
-    const categories = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-    const donut = document.querySelector(".donut-chart");
-
-    if (donut && totalExpenses > 0) {
-        let cursor = 0;
-        const parts = categories.map(([category, amount]) => {
-            const pct = amount / totalExpenses * 100;
-            const start = cursor;
-            cursor += pct;
-            return `${getCategoryColor(category)} ${start}% ${cursor}%`;
-        });
-        donut.style.setProperty("--donut-gradient", `conic-gradient(${parts.join(", ")})`);
-    } else if (donut) donut.style.setProperty("--donut-gradient", "#CBD5E1");
-
-    const list = document.getElementById("expenseCategoryList");
-    if (!list) return;
-    list.innerHTML = categories.length ? categories.map(([category, amount]) => `
-        <div class="category-row"><span><i class="category-dot" style="background:${getCategoryColor(category)}"></i>${escapeHtml(category)}</span><strong>${formatCurrency(amount)}</strong></div>
-    `).join("") : `<p class="empty-state">No expenses this month</p>`;
-}
-
-function renderBudgetOverview(source = monthExpenses(currentMonthKey())) {
-    const grid = document.querySelector(".budget-grid");
-    if (!grid) return;
-    const totals = categoryTotals(source);
-    grid.innerHTML = Object.keys(budgets).map(category => {
-        const spent = totals[category] || 0;
-        const limit = Number(budgets[category] || 0);
-        const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-        const over = spent > limit;
-        return `<div class="budget-card"><div class="budget-title">${getCategoryIcon(category)} <span>${escapeHtml(category)}</span></div><div class="budget-values">${formatCurrency(spent)} / ${formatCurrency(limit)}</div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><small class="${over ? "budget-over" : ""}">${over ? "Over budget" : `${pct.toFixed(0)}% used`}</small></div>`;
-    }).join("");
-}
-
 function ensureDashboardActions() {
     const pageHeader = document.querySelector(".page-header");
     if (!pageHeader) return;
@@ -289,29 +251,19 @@ function ensureDashboardActions() {
     }
 }
 
-function openIncomeModal(editIncome = null) {
-    openIncomeEditor(editIncome);
-}
-
-function openEditIncomeModal(id) {
-    const income = incomes.find(item => item.id === id);
-    if (!income) return;
-    openIncomeEditor(income);
-}
-
-function openIncomeEditor(editIncome = null) {
-    const isEdit = Boolean(editIncome);
-    editingIncomeId = isEdit ? editIncome.id : null;
+function openIncomeModal(mode = "add", income = null) {
+    const isEdit = mode === "edit" && income;
+    editingIncomeId = isEdit ? income.id : null;
     const modal = document.createElement("div");
     modal.className = "finnest-modal-backdrop";
     modal.innerHTML = `<div class="finnest-modal" role="dialog" aria-modal="true" aria-labelledby="incomeModalTitle">
         <div class="sheet-handle"></div>
         <div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2 id="incomeModalTitle">${isEdit ? "Edit Income" : "Add Income"}</h2></div><button class="sheet-close" id="closeIncome" type="button" aria-label="Close">×</button></div>
-        <div class="expense-field"><label for="incomeAmount">Amount</label><div class="amount-input-wrapper"><span>₹</span><input id="incomeAmount" type="number" min="0" step="0.01" placeholder="0" inputmode="decimal" value="${isEdit ? escapeHtml(editIncome.amount) : ""}"></div></div>
-        <div class="expense-field"><label for="incomeSource">Source</label><input id="incomeSource" type="text" placeholder="Salary, freelance, bonus…" value="${isEdit ? escapeHtml(editIncome.source || "") : ""}"></div>
-        <div class="expense-field"><label for="incomeDate">Date</label><input id="incomeDate" type="date" value="${isEdit ? escapeHtml(editIncome.date || todayString()) : todayString()}"></div>
+        <div class="expense-field"><label for="incomeAmount">Amount</label><div class="amount-input-wrapper"><span>₹</span><input id="incomeAmount" type="number" min="0" step="0.01" value="${isEdit ? escapeHtml(income.amount) : ""}" placeholder="0" inputmode="decimal"></div></div>
+        <div class="expense-field"><label for="incomeSource">Source</label><input id="incomeSource" type="text" value="${isEdit ? escapeHtml(income.source || "") : ""}" placeholder="Salary, freelance, bonus…"></div>
+        <div class="expense-field"><label for="incomeDate">Date</label><input id="incomeDate" type="date" value="${isEdit ? escapeHtml(income.date || todayString()) : todayString()}"></div>
+        ${isEdit ? `<button class="delete-income-button" id="deleteIncome" type="button">Delete Income</button>` : ""}
         <div class="expense-actions"><button class="cancel-expense" id="closeIncome2" type="button">Cancel</button><button class="save-expense" id="saveIncome" type="button">${isEdit ? "Save Changes" : "Add Income"}</button></div>
-        ${isEdit ? '<button class="delete-income-button" id="deleteIncomeButton" type="button">Delete Income</button>' : ''}
     </div>`;
     document.body.appendChild(modal);
     document.body.style.overflow = "hidden";
@@ -319,17 +271,21 @@ function openIncomeEditor(editIncome = null) {
     modal.querySelector("#closeIncome").onclick = close;
     modal.querySelector("#closeIncome2").onclick = close;
     modal.onclick = event => { if (event.target === modal) close(); };
+
     modal.querySelector("#saveIncome").onclick = async () => {
         const amount = Number(modal.querySelector("#incomeAmount").value);
         if (!amount || amount <= 0) return alert("Please enter a valid income amount.");
         const source = modal.querySelector("#incomeSource").value.trim() || "Other income";
         const date = modal.querySelector("#incomeDate").value || todayString();
+        const localId = editingIncomeId || Date.now();
+        const shouldUpdate = Boolean(editingIncomeId);
         try {
-            const saved = await window.FinNestIncomeService?.save({ amount, source, date, id: editingIncomeId });
+            const saved = await window.FinNestIncomeService?.save({ amount, source, date, id: shouldUpdate ? localId : null });
             if (!saved) throw new Error("Income service is unavailable. Please refresh and try again.");
-            if (editingIncomeId) {
-                const index = incomes.findIndex(item => item.id === editingIncomeId);
+            if (shouldUpdate) {
+                const index = incomes.findIndex(item => item.id === localId);
                 if (index >= 0) incomes[index] = saved;
+                else incomes.unshift(saved);
             } else {
                 incomes.unshift(saved);
             }
@@ -341,11 +297,12 @@ function openIncomeEditor(editIncome = null) {
             alert(error?.message || "Income could not be saved. Please try again.");
         }
     };
-    modal.querySelector("#deleteIncomeButton")?.addEventListener("click", async () => {
+
+    modal.querySelector("#deleteIncome")?.addEventListener("click", async () => {
         if (!editingIncomeId) return;
         const target = incomes.find(item => item.id === editingIncomeId);
         if (!target) return;
-        if (!confirm(`Delete ${target.source || "income"} — ${formatCurrency(target.amount)}?`)) return;
+        if (!confirm(`Delete ${target.source || "this income"} — ${formatCurrency(target.amount)}?`)) return;
         try {
             await window.FinNestIncomeService?.remove(editingIncomeId);
             incomes = incomes.filter(item => item.id !== editingIncomeId);
@@ -357,7 +314,13 @@ function openIncomeEditor(editIncome = null) {
             alert(error?.message || "Income could not be deleted. Please try again.");
         }
     });
+
     setTimeout(() => modal.querySelector("#incomeAmount")?.focus(), 100);
+}
+
+function openEditIncomeModal(id) {
+    const income = incomes.find(item => item.id === id);
+    if (income) openIncomeModal("edit", income);
 }
 
 function ensurePayerField() {
