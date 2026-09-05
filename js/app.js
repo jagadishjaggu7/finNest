@@ -184,12 +184,10 @@ function renderRecentTransactions() {
     const container = document.getElementById("recentTransactions");
     if (!container) return;
     const recent = [...expenses].sort((a, b) => `${b.date}-${b.id}`.localeCompare(`${a.date}-${a.id}`)).slice(0, 6);
-
     if (!recent.length) {
         container.innerHTML = `<div class="empty-state">No expenses yet. Add your first expense.</div>`;
         return;
     }
-
     container.innerHTML = recent.map(expense => `
         <div class="transaction" data-expense-id="${expense.id}" role="button" tabindex="0">
             <div class="transaction-icon" style="background:${getCategoryColor(expense.category)}18">${getCategoryIcon(expense.category)}</div>
@@ -200,7 +198,6 @@ function renderRecentTransactions() {
             <strong class="amount expense-amount">-${formatCurrency(expense.amount)}</strong>
         </div>
     `).join("");
-
     container.querySelectorAll("[data-expense-id]").forEach(row => {
         row.addEventListener("click", () => openEditExpense(Number(row.dataset.expenseId)));
         row.addEventListener("keydown", event => {
@@ -210,20 +207,20 @@ function renderRecentTransactions() {
 }
 
 function renderRecentIncomes() {
-    const existing = document.getElementById("recentIncomeList");
-    if (!existing) return;
+    const container = document.getElementById("recentIncomeList");
+    if (!container) return;
     const recent = [...incomes].sort((a, b) => `${b.date}-${b.id}`.localeCompare(`${a.date}-${a.id}`)).slice(0, 6);
     if (!recent.length) {
-        existing.innerHTML = `<div class="empty-state">No income yet.</div>`;
+        container.innerHTML = `<div class="empty-state">No income yet. Click + Add Income to create one.</div>`;
         return;
     }
-    existing.innerHTML = recent.map(income => `
-        <button class="income-row" type="button" data-income-id="${income.id}">
+    container.innerHTML = recent.map(income => `
+        <button class="income-row" type="button" data-income-id="${income.id}" aria-label="Edit ${escapeHtml(income.source || "income")}">
             <span class="income-row-main"><strong>${escapeHtml(income.source || "Other income")}</strong><small>${formatDate(income.date)}</small></span>
             <span class="income-row-amount">+${formatCurrency(income.amount)}</span>
         </button>
     `).join("");
-    existing.querySelectorAll("[data-income-id]").forEach(row => {
+    container.querySelectorAll("[data-income-id]").forEach(row => {
         row.addEventListener("click", () => openEditIncomeModal(Number(row.dataset.incomeId)));
     });
 }
@@ -231,29 +228,20 @@ function renderRecentIncomes() {
 function ensureDashboardActions() {
     const pageHeader = document.querySelector(".page-header");
     if (!pageHeader) return;
-
-    let actions = pageHeader.querySelector(".page-actions");
-    if (!actions) {
-        actions = document.createElement("div");
-        actions.className = "page-actions";
-        pageHeader.appendChild(actions);
-    }
-
-    let button = actions.querySelector("#dashboardIncomeBtn");
-    if (!button) {
-        actions.innerHTML = `<button id="dashboardIncomeBtn" class="primary-btn" type="button"><span aria-hidden="true">+</span><span>Add Income</span></button>`;
-        button = actions.querySelector("#dashboardIncomeBtn");
-    }
-
-    if (button && button.dataset.bound !== "true") {
-        button.dataset.bound = "true";
-        button.addEventListener("click", () => openIncomeModal());
-    }
+    const button = pageHeader.querySelector("#dashboardIncomeBtn");
+    if (!button) return;
+    button.onclick = null;
+    button.onclick = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openIncomeModal();
+    };
 }
 
 function openIncomeModal(mode = "add", income = null) {
     const isEdit = mode === "edit" && income;
     editingIncomeId = isEdit ? income.id : null;
+    document.querySelectorAll(".finnest-modal-backdrop").forEach(existing => existing.remove());
     const modal = document.createElement("div");
     modal.className = "finnest-modal-backdrop";
     modal.innerHTML = `<div class="finnest-modal" role="dialog" aria-modal="true" aria-labelledby="incomeModalTitle">
@@ -314,7 +302,6 @@ function openIncomeModal(mode = "add", income = null) {
             alert(error?.message || "Income could not be deleted. Please try again.");
         }
     });
-
     setTimeout(() => modal.querySelector("#incomeAmount")?.focus(), 100);
 }
 
@@ -341,7 +328,6 @@ function openExpenseSheet(mode = "add", expense = null) {
     editingExpenseId = mode === "edit" && expense ? expense.id : null;
     sheet.querySelector("h2").textContent = editingExpenseId ? "Edit Expense" : "Add Expense";
     document.getElementById("saveExpense").textContent = editingExpenseId ? "Save Changes" : "Add Expense";
-
     if (expense) {
         document.getElementById("expenseAmount").value = expense.amount;
         document.getElementById("expenseAccount").value = expense.account;
@@ -355,7 +341,6 @@ function openExpenseSheet(mode = "add", expense = null) {
         document.getElementById("expenseDate").value = todayString();
         document.getElementById("expensePayer").value = familyMembers[0];
     }
-
     ensureDeleteButton();
     document.getElementById("deleteExpenseButton").style.display = editingExpenseId ? "block" : "none";
     sheet.classList.add("open");
@@ -404,7 +389,6 @@ function saveExpenseFromForm() {
     const note = document.getElementById("expenseNote").value.trim();
     const date = document.getElementById("expenseDate").value || todayString();
     const payer = document.getElementById("expensePayer")?.value || familyMembers[0];
-
     if (editingExpenseId) {
         const target = expenses.find(e => e.id === editingExpenseId);
         if (target) Object.assign(target, { amount, category, type, account, note, date });
@@ -414,7 +398,6 @@ function saveExpenseFromForm() {
         expenses.unshift({ id, amount, category, type, account, note, date });
         familyPayers[id] = payer;
     }
-
     persistState();
     closeExpenseSheet();
     renderDashboard();
@@ -508,6 +491,15 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("cancelExpense")?.addEventListener("click", closeExpenseSheet);
     document.getElementById("saveExpense")?.addEventListener("click", saveExpenseFromForm);
     document.getElementById("desktopAddExpense")?.addEventListener("click", () => openExpenseSheet());
+    document.querySelector(".add-expense-button")?.addEventListener("click", () => openExpenseSheet());
 
     bootApp();
+});
+
+document.addEventListener("finnest:cloud-data-ready", () => {
+    try {
+        renderDashboard();
+    } catch (error) {
+        console.error("FinNest dashboard refresh failed", error);
+    }
 });
