@@ -1,8 +1,7 @@
 /* FinNest shared runtime context.
    Single source for authenticated user, active household, members and profile.
-   UI modules should read this context instead of resolving household membership
-   independently. Context is cached for the current browser session and can be
-   refreshed explicitly after auth/family changes.
+   Uses the real household_members schema: ownership is represented by role,
+   not by an is_owner column.
 */
 (function () {
     const supabase = window.finnestSupabase;
@@ -22,14 +21,13 @@
     async function resolveHousehold(userId) {
         const { data: memberships, error } = await supabase
             .from('household_members')
-            .select('id,household_id,user_id,display_name,role,is_owner,created_at,households(id,name,owner_id)')
+            .select('id,household_id,user_id,display_name,role,created_at,households(id,name,owner_id)')
             .eq('user_id', userId)
             .order('created_at', { ascending: true });
         if (error) throw error;
 
         const rows = memberships || [];
         const selected =
-            rows.find(m => m.is_owner === true) ||
             rows.find(m => m.role === 'owner') ||
             rows.find(m => m.households?.owner_id === userId) ||
             rows[0] ||
@@ -41,7 +39,7 @@
 
         const { data: members, error: membersError } = await supabase
             .from('household_members')
-            .select('id,household_id,user_id,display_name,role,is_owner,created_at')
+            .select('id,household_id,user_id,display_name,role,created_at')
             .eq('household_id', selected.household_id)
             .order('created_at', { ascending: true });
         if (membersError) throw membersError;
