@@ -246,26 +246,37 @@ function renderBudgetOverview(source = monthExpenses(currentMonthKey())) {
 }
 
 function ensureDashboardActions() {
-    const header = document.querySelector(".page-header > div");
-    if (!header || document.getElementById("quickIncomeButton")) return;
-    const actions = document.createElement("div");
-    actions.className = "finnest-header-actions";
-    actions.innerHTML = `<button class="finnest-secondary-button" id="quickIncomeButton">+ Add Income</button>`;
-    header.parentElement.appendChild(actions);
-    const button = document.getElementById("quickIncomeButton");
-    if (button) button.type = "button";
-    if (button) button.onclick = openIncomeModal;
-}
+    const pageHeader = document.querySelector(".page-header");
+    if (!pageHeader) return;
 
-async function refreshIncomeData() {
-    const user = await window.FinNestCloud?.loadCloudForCurrentUser?.();
-    if (user) renderDashboard();
+    let actions = pageHeader.querySelector(".page-actions");
+    if (!actions) {
+        actions = document.createElement("div");
+        actions.className = "page-actions";
+        pageHeader.appendChild(actions);
+    }
+
+    let button = actions.querySelector("#dashboardIncomeBtn");
+    if (!button) {
+        actions.innerHTML = `
+            <button id="dashboardIncomeBtn" class="primary-btn" type="button">
+                <span aria-hidden="true">+</span>
+                <span>Add Income</span>
+            </button>
+        `;
+        button = actions.querySelector("#dashboardIncomeBtn");
+    }
+
+    if (button && button.dataset.bound !== "true") {
+        button.dataset.bound = "true";
+        button.addEventListener("click", openIncomeModal);
+    }
 }
 
 function openIncomeModal() {
     const modal = document.createElement("div");
     modal.className = "finnest-modal-backdrop";
-    modal.innerHTML = `<div class="finnest-modal"><div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2>Add Income</h2></div><button class="sheet-close" id="closeIncome">×</button></div><div class="expense-field"><label>Amount</label><div class="amount-input-wrapper"><span>₹</span><input id="incomeAmount" type="number" min="0" step="0.01" placeholder="0" inputmode="decimal"></div></div><div class="expense-field"><label>Source</label><input id="incomeSource" type="text" placeholder="Salary, freelance, bonus…"></div><div class="expense-field"><label>Date</label><input id="incomeDate" type="date" value="${todayString()}"></div><div class="expense-actions"><button class="cancel-expense" id="closeIncome2" type="button">Cancel</button><button class="save-expense" id="saveIncome" type="button">Add Income</button></div></div>`;
+    modal.innerHTML = `<div class="finnest-modal" role="dialog" aria-modal="true" aria-labelledby="incomeModalTitle"><div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2 id="incomeModalTitle">Add Income</h2></div><button class="sheet-close" id="closeIncome" type="button" aria-label="Close">×</button></div><div class="expense-field"><label for="incomeAmount">Amount</label><div class="amount-input-wrapper"><span>₹</span><input id="incomeAmount" type="number" min="0" step="0.01" placeholder="0" inputmode="decimal"></div></div><div class="expense-field"><label for="incomeSource">Source</label><input id="incomeSource" type="text" placeholder="Salary, freelance, bonus…"></div><div class="expense-field"><label for="incomeDate">Date</label><input id="incomeDate" type="date" value="${todayString()}"></div><div class="expense-actions"><button class="cancel-expense" id="closeIncome2" type="button">Cancel</button><button class="save-expense" id="saveIncome" type="button">Add Income</button></div></div>`;
     document.body.appendChild(modal);
     document.body.style.overflow = "hidden";
     const close = () => { modal.remove(); document.body.style.overflow = ""; };
@@ -281,7 +292,8 @@ function openIncomeModal() {
         const localIncome = { id, amount, source, date };
         try {
             const saved = await window.FinNestIncomeService?.save({ amount, source, date, id });
-            incomes.unshift(saved || localIncome);
+            if (!saved) throw new Error("Income service is unavailable. Please refresh and try again.");
+            incomes.unshift(saved);
             persistState();
             close();
             renderDashboard();
