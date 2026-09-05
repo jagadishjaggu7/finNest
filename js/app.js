@@ -223,26 +223,18 @@ function renderExpenseOverview(sourceExpenses) {
 function renderBudgetOverview(currentExpenses) {
     const container = document.querySelector(".budget-grid");
     if (!container) return;
-
     const data = budgets && typeof budgets === "object" && !Array.isArray(budgets) ? budgets : {};
     const spent = categoryTotals(currentExpenses || []);
     const entries = Object.entries(data);
-
     if (!entries.length) {
         container.innerHTML = `<div class="empty-state">No personal monthly budgets set yet.</div>`;
         return;
     }
-
     container.innerHTML = entries.map(([category, limit]) => {
         const used = Number(spent[category] || 0);
         const budget = Number(limit || 0);
         const pct = budget > 0 ? Math.min(100, used / budget * 100) : 0;
-        return `<div class="budget-card">
-            <div class="budget-title"><span>${getCategoryIcon(category)}</span>${escapeHtml(category)}</div>
-            <div class="budget-values">${formatCurrency(used)} spent · ${formatCurrency(budget)} budget</div>
-            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
-            <small>${pct.toFixed(0)}% used</small>
-        </div>`;
+        return `<div class="budget-card"><div class="budget-title"><span>${getCategoryIcon(category)}</span>${escapeHtml(category)}</div><div class="budget-values">${formatCurrency(used)} spent · ${formatCurrency(budget)} budget</div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><small>${pct.toFixed(0)}% used</small></div>`;
     }).join("");
 }
 
@@ -257,18 +249,12 @@ function renderRecentTransactions() {
     container.innerHTML = recent.map(expense => `
         <div class="transaction" data-expense-id="${expense.id}" role="button" tabindex="0">
             <div class="transaction-icon" style="background:${getCategoryColor(expense.category)}18">${getCategoryIcon(expense.category)}</div>
-            <div class="transaction-info">
-                <strong>${escapeHtml(expense.note || expense.category)}</strong>
-                <span>${escapeHtml(expense.category)} · ${escapeHtml(expense.account)}${expense.type === "shared" ? " · Shared" : ""}</span>
-            </div>
+            <div class="transaction-info"><strong>${escapeHtml(expense.note || expense.category)}</strong><span>${escapeHtml(expense.category)} · ${escapeHtml(expense.account)}${expense.type === "shared" ? " · Shared" : ""}</span></div>
             <strong class="amount expense-amount">-${formatCurrency(expense.amount)}</strong>
-        </div>
-    `).join("");
+        </div>`).join("");
     container.querySelectorAll("[data-expense-id]").forEach(row => {
         row.addEventListener("click", () => openEditExpense(Number(row.dataset.expenseId)));
-        row.addEventListener("keydown", event => {
-            if (event.key === "Enter" || event.key === " ") openEditExpense(Number(row.dataset.expenseId));
-        });
+        row.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") openEditExpense(Number(row.dataset.expenseId)); });
     });
 }
 
@@ -284,8 +270,7 @@ function renderRecentIncomes() {
         <button class="income-row" type="button" data-income-id="${income.id}" aria-label="Edit ${escapeHtml(income.source || "income")}">
             <span class="income-row-main"><strong>${escapeHtml(income.source || "Other income")}</strong><small>${formatDate(income.date)}</small></span>
             <span class="income-row-amount">+${formatCurrency(income.amount)}</span>
-        </button>
-    `).join("");
+        </button>`).join("");
     container.querySelectorAll("[data-income-id]").forEach(row => {
         row.addEventListener("click", () => openEditIncomeModal(Number(row.dataset.incomeId)));
     });
@@ -294,21 +279,33 @@ function renderRecentIncomes() {
 function ensureDashboardActions() {
     const button = document.getElementById("dashboardIncomeBtn");
     if (!button) return;
-    button.onclick = openIncomeModal;
+    button.onclick = event => { event.preventDefault(); event.stopPropagation(); openIncomeModal(); };
 }
 
 function bindDashboardLinks() {
-    document.getElementById("viewAllIncome")?.addEventListener("click", () => {
-        const first = incomes[0];
-        if (first) openEditIncomeModal(first.id);
-    });
-    document.getElementById("viewAllTransactions")?.addEventListener("click", () => {
-        currentView = "Expenses";
-        renderCurrentView();
-    });
-    document.getElementById("viewAllBudgets")?.addEventListener("click", () => {
-        if (typeof window.renderBudgetsView === "function") window.renderBudgetsView();
-    });
+    const incomeLink = document.getElementById("viewAllIncome");
+    if (incomeLink && incomeLink.dataset.bound !== "true") {
+        incomeLink.dataset.bound = "true";
+        incomeLink.addEventListener("click", () => {
+            const first = incomes[0];
+            if (first) openEditIncomeModal(first.id);
+        });
+    }
+    const transactionLink = document.getElementById("viewAllTransactions");
+    if (transactionLink && transactionLink.dataset.bound !== "true") {
+        transactionLink.dataset.bound = "true";
+        transactionLink.addEventListener("click", () => { currentView = "Expenses"; renderCurrentView(); });
+    }
+    const budgetLink = document.getElementById("viewAllBudgets");
+    if (budgetLink && budgetLink.dataset.bound !== "true") {
+        budgetLink.dataset.bound = "true";
+        budgetLink.addEventListener("click", () => { if (typeof window.renderBudgetsView === "function") window.renderBudgetsView(); });
+    }
+    const reportLink = document.getElementById("viewExpenseReport");
+    if (reportLink && reportLink.dataset.bound !== "true") {
+        reportLink.dataset.bound = "true";
+        reportLink.addEventListener("click", () => { currentView = "Reports"; renderCurrentView(); });
+    }
 }
 
 function openIncomeModal(mode = "add", income = null) {
@@ -329,12 +326,7 @@ function openIncomeModal(mode = "add", income = null) {
     document.body.appendChild(modal);
     document.body.style.overflow = "hidden";
 
-    const close = () => {
-        modal.remove();
-        document.body.style.overflow = "";
-        editingIncomeId = null;
-    };
-
+    const close = () => { modal.remove(); document.body.style.overflow = ""; editingIncomeId = null; };
     modal.querySelector("#closeIncome").onclick = close;
     modal.querySelector("#closeIncome2").onclick = close;
     modal.onclick = event => { if (event.target === modal) close(); };
@@ -346,14 +338,12 @@ function openIncomeModal(mode = "add", income = null) {
         const date = modal.querySelector("#incomeDate").value || todayString();
         const localId = editingIncomeId || Date.now();
         const shouldUpdate = Boolean(editingIncomeId);
-
         try {
             const saved = await window.FinNestIncomeService?.save({ amount, source, date, id: shouldUpdate ? localId : null });
             if (!saved) throw new Error("Income service is unavailable. Please refresh and try again.");
             if (shouldUpdate) {
                 const index = incomes.findIndex(item => item.id === localId);
-                if (index >= 0) incomes[index] = saved;
-                else incomes.unshift(saved);
+                if (index >= 0) incomes[index] = saved; else incomes.unshift(saved);
             } else {
                 incomes.unshift(saved);
             }
@@ -368,12 +358,12 @@ function openIncomeModal(mode = "add", income = null) {
 
     modal.querySelector("#deleteIncome")?.addEventListener("click", async () => {
         if (!editingIncomeId) return;
-        const target = incomes.find(item => item.id === editingIncomeId);
+        const target = incomes.find(item => String(item.id) === String(editingIncomeId));
         if (!target) return;
         if (!confirm(`Delete ${target.source || "this income"} — ${formatCurrency(target.amount)}?`)) return;
         try {
-            await window.FinNestIncomeService?.remove(editingIncomeId);
-            incomes = incomes.filter(item => item.id !== editingIncomeId);
+            await window.FinNestIncomeService?.remove(editingIncomeId, target);
+            incomes = incomes.filter(item => String(item.id) !== String(editingIncomeId));
             persistState();
             close();
             renderDashboard();
@@ -387,7 +377,7 @@ function openIncomeModal(mode = "add", income = null) {
 }
 
 function openEditIncomeModal(id) {
-    const income = incomes.find(item => item.id === id);
+    const income = incomes.find(item => String(item.id) === String(id));
     if (income) openIncomeModal("edit", income);
 }
 
@@ -577,14 +567,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("saveExpense")?.addEventListener("click", saveExpenseFromForm);
     document.getElementById("desktopAddExpense")?.addEventListener("click", () => openExpenseSheet());
     document.querySelector(".add-expense-button")?.addEventListener("click", () => openExpenseSheet());
-
     bootApp();
 });
 
 document.addEventListener("finnest:cloud-data-ready", () => {
-    try {
-        renderDashboard();
-    } catch (error) {
-        console.error("FinNest dashboard refresh failed", error);
-    }
+    try { renderDashboard(); } catch (error) { console.error("FinNest dashboard refresh failed", error); }
 });
