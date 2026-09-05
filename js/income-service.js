@@ -22,32 +22,26 @@
         localStorage.setItem(mapKey, JSON.stringify(map));
     }
 
-    function mapIncomeId(id) {
-        return idMap().incomes?.[id] || idMap().incomes?.[String(id)] || null;
+    function findMappedUuid(map, id) {
+        return map.incomes?.[id] || map.incomes?.[String(id)] || null;
     }
 
-    async function resolveIncomeUuid(id, userId) {
-        const mapped = mapIncomeId(id);
-        if (mapped) return mapped;
-        if (!client() || !userId) return null;
+    async function findCloudMatch(userId, target) {
+        if (!target) return null;
+        const amount = Number(target.amount || 0);
+        const source = String(target.source || "Other income").trim() || "Other income";
+        const date = target.date || new Date().toISOString().slice(0, 10);
 
-        // Cloud-loaded records should be editable even when an older browser
-        // cache did not contain the local-id -> UUID mapping.
         const { data, error } = await client()
             .from("incomes")
-            .select("id")
+            .select("id,amount,source,income_date")
             .eq("user_id", userId)
-            .order("income_date", { ascending: false });
+            .eq("amount", amount)
+            .eq("source", source)
+            .eq("income_date", date)
+            .order("id", { ascending: true });
         if (error) throw error;
-
-        const rows = data || [];
-        if (!rows.length) return null;
-
-        // The UI's local IDs are generated from the cloud result order during
-        // loadCloud(). Recreate that mapping when possible by pairing the
-        // missing local record with the corresponding cloud row using amount,
-        // source and date before falling back to the ID's position.
-        return null;
+        return (data || [])[0] || null;
     }
 
     async function save({ amount, source, date, id = null }) {
@@ -63,34 +57,23 @@
         const incomeSource = String(source || "Other income").trim() || "Other income";
         const map = idMap();
         map.incomes = map.incomes || {};
-        const uuid = id ? map.incomes[id] || map.incomes[String(id)] : null;
+        const uuid = id ? findMappedUuid(map, id) : null;
         const row = { user_id: user.id, amount: numericAmount, source: incomeSource, income_date: incomeDate };
 
         let result;
         if (uuid) {
             result = await client().from("incomes").update(row).eq("id", uuid).eq("user_id", user.id).select("id,amount,source,income_date").maybeSingle();
-            if (!result.error && result.data) {
+            if (result.error) throw result.error;
+            if (result.data) {
                 const localId = id || Date.now();
                 map.incomes[localId] = result.data.id;
                 saveMap(map);
                 return { id: localId, amount: Number(result.data.amount || 0), source: result.data.source || "Other income", date: result.data.income_date };
             }
-            if (result.error) throw result.error;
         }
 
-        // No mapping exists (common after clearing localStorage). Use a
-        // current cloud row with the same fields before creating a duplicate.
-        const { data: matches, error: lookupError } = await client()
-            .from("incomes")
-            .select("id,amount,source,income_date")
-            .eq("user_id", user.id)
-            .eq("amount", numericAmount)
-            .eq("source", incomeSource)
-            .eq("income_date", incomeDate)
-            .limit(1);
-        if (lookupError) throw lookupError;
-        if (matches?.[0]) {
-            const matched = matches[0];
+        const matched = await findCloudMatch(user.id, { amount: numericAmount, source: incomeSource, date: incomeDate });
+        if (matched) {
             const localId = id || Date.now();
             map.incomes[localId] = matched.id;
             saveMap(map);
@@ -107,36 +90,21 @@
         return { id: localId, amount: Number(result.data.amount || 0), source: result.data.source || "Other income", date: result.data.income_date };
     }
 
-    async function remove(id) {
+    async function remove(id, target = null) {
         const user = await currentUser();
         if (!user) throw new Error("Please sign in first.");
         if (!id) throw new Error("Income ID is required.");
 
         const map = idMap();
         map.incomes = map.incomes || {};
-        let uuid = map.incomes[id] || map.incomes[String(id)] || null;
+        let uuid = findMappedUuid(map, id);
 
-        // Repair missing legacy mappings by matching the local record against
-        // the authenticated user's cloud rows. The UI supplies the local ID,
-        // while app.js still has the full local record available.
-        if (!uuid && window.incomes) {
-            const target = Array.isArray(window.incomes) ? window.incomes.find(item => String(item.id) === String(id)) : null;
-            if (target) {
-                const { data: matches, error: lookupError } = await client()
-                    .from("incomes")
-                    .select("id,amount,source,income_date")
-                    .eq("user_id", user.id)
-                    .eq("amount", Number(target.amount || 0))
-                    .eq("source", String(target.source || "Other income"))
-                    .eq("income_date", target.date || new Date().toISOString().slice(0, 10))
-                    .order("id", { ascending: true })
-                    .limit(1);
-                if (lookupError) throw lookupError;
-                uuid = matches?.[0]?.id || null;
-                if (uuid) {
-                    map.incomes[id] = uuid;
-                    saveMap(map);
-                }
+        if (!uuid && target) {
+            const matched = await findCloudMatch(user.id, target);
+            if (matched) {
+                uuid = matched.id;
+                map.incomes[id] = uuid;
+                saveMap(map);
             }
         }
 
@@ -147,7 +115,6 @@
             .delete()
             .eq("id", uuid)
             .eq("user_id", user.id);
-
         if (error) throw error;
 
         delete map.incomes[id];
