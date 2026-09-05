@@ -1,4 +1,4 @@
-/* FinNest Settings — cloud-backed family names with deterministic household selection. */
+/* FinNest Settings — cloud-backed family names using shared runtime context. */
 (function () {
     const supabase = window.finnestSupabase;
     if (!supabase) return;
@@ -6,30 +6,11 @@
     const esc = value => String(value ?? '').replace(/[&<>\"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;', "'":'&#39;' }[c]));
 
     async function getContext() {
+        if (window.FinNestContext) return window.FinNestContext.load();
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
         const user = sessionData?.session?.user;
-        if (!user) return { user: null, members: [], household: null };
-
-        const { data: memberships, error: membershipError } = await supabase
-            .from('household_members')
-            .select('id,household_id,user_id,display_name,role,created_at,households(id,name,owner_id)')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true });
-        if (membershipError) throw membershipError;
-
-        const owned = (memberships || []).find(m => m.households?.owner_id === user.id);
-        const membership = owned || memberships?.[0];
-        if (!membership?.household_id) return { user, members: [], household: null };
-
-        const { data: members, error: membersError } = await supabase
-            .from('household_members')
-            .select('id,user_id,display_name,role,created_at')
-            .eq('household_id', membership.household_id)
-            .order('created_at', { ascending: true });
-        if (membersError) throw membersError;
-
-        return { user, members: members || [], household: membership.households || null };
+        return { user: user || null, members: [], household: null, householdId: null };
     }
 
     function styles() {
@@ -64,33 +45,28 @@
                 .from('household_members')
                 .update({ display_name: value })
                 .eq('id', member.id)
-                .eq('household_id', context.household.id);
+                .eq('household_id', context.householdId);
             if (memberError) throw memberError;
 
             if (member.user_id === user.id) {
-                // Upsert instead of update: a newly-created auth user may not yet
-                // have a profiles row. An UPDATE with zero matching rows returns
-                // no error, which previously made the nickname appear saved until
-                // the next refresh, when auth-ui fell back to the email name.
                 const { error: profileError } = await supabase
                     .from('profiles')
-                    .upsert({ id: user.id, display_name: value, currency: 'INR (₹)' }, { onConflict: 'id' });
+                    .upsert({ id: user.id, display_name: value, currency: context.profile?.currency || 'INR (₹)' }, { onConflict: 'id' });
                 if (profileError) throw profileError;
 
-                const { error: authError } = await supabase.auth.updateUser({
-                    data: { display_name: value }
-                });
+                const { error: authError } = await supabase.auth.updateUser({ data: { display_name: value } });
                 if (authError) throw authError;
 
                 localStorage.setItem('finnest_profile', JSON.stringify({
                     name: value,
                     email: user.email || '',
-                    currency: 'INR (₹)'
+                    currency: context.profile?.currency || 'INR (₹)'
                 }));
             }
 
             const names = context.members.map(m => m.id === member.id ? value : (m.display_name || 'Member'));
             localStorage.setItem('finnest_family_members', JSON.stringify(names));
+            await window.FinNestContext?.refresh?.();
             window.dispatchEvent(new CustomEvent('finnest:family-members-changed'));
             window.dispatchEvent(new CustomEvent('finnest:profile-changed', { detail: { name: value } }));
             alert('Family member updated.');
@@ -116,10 +92,10 @@
                 return;
             }
             localStorage.setItem('finnest_family_members', JSON.stringify(context.members.map(m => m.display_name || 'Member')));
-            if (!context.members.length) {
+            if (!context.members.length || !context.householdId) {
                 host.innerHTML = '<div class="cloud-family-empty">No family household is linked to this account yet. Open Family to create or join one.</div>';
             } else {
-                host.innerHTML = context.members.map(member => `<div class="cloud-family-row"><div class="cloud-family-avatar">${esc(initials(member.display_name))}</div><div class="cloud-family-main"><input value="${esc(member.display_name || '')}" data-member-id="${esc(member.id)}"><span class="cloud-family-role">${member.user_id === context.user.id ? 'You' : (member.role === 'owner' ? 'Owner' : 'Family member')}</span></div><button class="cloud-family-save" data-save-member="${esc(member.id)}">Save</button></div>`).join('');
+                host.innerHTML = context.members.map(member => `<div class="cloud-family-row"><div class="cloud-family-avatar">${esc(initials(member.display_name))}</div><div class="cloud-family-main"><input value="${esc(member.display_name || '')}" data-member-id="${esc(member.id)}"><span class="cloud-family-role">${member.user_id === context.user.id ? 'You' : (member.role === 'owner' || member.is_owner ? 'Owner' : 'Family member')}</span></div><button class="cloud-family-save" data-save-member="${esc(member.id)}">Save</button></div>`).join('');
                 host.querySelectorAll('[data-save-member]').forEach(button => button.onclick = async () => {
                     const member = context.members.find(m => m.id === button.dataset.saveMember);
                     const input = host.querySelector(`[data-member-id="${button.dataset.saveMember}"]`);
