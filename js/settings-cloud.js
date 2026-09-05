@@ -41,6 +41,7 @@
         button.disabled = true;
         button.textContent = 'Saving…';
         try {
+            if (!context.householdId) throw new Error('No active family household is available.');
             const { error: memberError } = await supabase
                 .from('household_members')
                 .update({ display_name: value })
@@ -53,15 +54,9 @@
                     .from('profiles')
                     .upsert({ id: user.id, display_name: value, currency: context.profile?.currency || 'INR (₹)' }, { onConflict: 'id' });
                 if (profileError) throw profileError;
-
                 const { error: authError } = await supabase.auth.updateUser({ data: { display_name: value } });
                 if (authError) throw authError;
-
-                localStorage.setItem('finnest_profile', JSON.stringify({
-                    name: value,
-                    email: user.email || '',
-                    currency: context.profile?.currency || 'INR (₹)'
-                }));
+                localStorage.setItem('finnest_profile', JSON.stringify({ name: value, email: user.email || '', currency: context.profile?.currency || 'INR (₹)' }));
             }
 
             const names = context.members.map(m => m.id === member.id ? value : (m.display_name || 'Member'));
@@ -95,7 +90,7 @@
             if (!context.members.length || !context.householdId) {
                 host.innerHTML = '<div class="cloud-family-empty">No family household is linked to this account yet. Open Family to create or join one.</div>';
             } else {
-                host.innerHTML = context.members.map(member => `<div class="cloud-family-row"><div class="cloud-family-avatar">${esc(initials(member.display_name))}</div><div class="cloud-family-main"><input value="${esc(member.display_name || '')}" data-member-id="${esc(member.id)}"><span class="cloud-family-role">${member.user_id === context.user.id ? 'You' : (member.role === 'owner' || member.is_owner ? 'Owner' : 'Family member')}</span></div><button class="cloud-family-save" data-save-member="${esc(member.id)}">Save</button></div>`).join('');
+                host.innerHTML = context.members.map(member => `<div class="cloud-family-row"><div class="cloud-family-avatar">${esc(initials(member.display_name))}</div><div class="cloud-family-main"><input value="${esc(member.display_name || '')}" data-member-id="${esc(member.id)}"><span class="cloud-family-role">${member.user_id === context.user.id ? 'You' : (member.role === 'owner' ? 'Owner' : 'Family member')}</span></div><button class="cloud-family-save" data-save-member="${esc(member.id)}">Save</button></div>`).join('');
                 host.querySelectorAll('[data-save-member]').forEach(button => button.onclick = async () => {
                     const member = context.members.find(m => m.id === button.dataset.saveMember);
                     const input = host.querySelector(`[data-member-id="${button.dataset.saveMember}"]`);
