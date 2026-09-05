@@ -84,29 +84,7 @@
             return data;
         }
 
-        let existingQuery = supabase.from('budgets').select('id')
-            .eq('category', category)
-            .eq('period_type', period)
-            .eq('period_start', info.startKey)
-            .eq('budget_scope', scope)
-            .limit(1);
-        existingQuery = scope === 'family'
-            ? existingQuery.eq('household_id', householdId)
-            : existingQuery.eq('user_id', ctx.user.id).is('household_id', null);
-
-        const { data: existing, error: lookupError } = await existingQuery.maybeSingle();
-        if (lookupError) throw lookupError;
-        if (existing?.id) {
-            const { data, error } = await supabase.from('budgets')
-                .update({ amount: numericAmount, updated_at: new Date().toISOString() })
-                .eq('id', existing.id)
-                .select('id,user_id,category,amount,month_start,period_type,period_start,budget_scope,household_id,created_at,updated_at')
-                .single();
-            if (error) throw error;
-            return data;
-        }
-
-        const { data, error } = await supabase.from('budgets').insert({
+        const payload = {
             user_id: ctx.user.id,
             category,
             amount: numericAmount,
@@ -115,7 +93,15 @@
             period_start: info.startKey,
             budget_scope: scope,
             household_id: householdId
-        }).select('id,user_id,category,amount,month_start,period_type,period_start,budget_scope,household_id,created_at,updated_at').single();
+        };
+
+        const { data, error } = await supabase
+            .from('budgets')
+            .upsert(payload, {
+                onConflict: 'user_id,category,month_start'
+            })
+            .select('id,user_id,category,amount,month_start,period_type,period_start,budget_scope,household_id,created_at,updated_at')
+            .single();
         if (error) throw error;
         return data;
     }
