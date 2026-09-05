@@ -13,25 +13,26 @@
     const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
     const escapeHtml = value => String(value ?? '').replace(/[&<>\"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;', "'":'&#39;' }[c]));
 
-    async function getUser() {
-        if (!supabase) return null;
-        const { data } = await supabase.auth.getSession();
-        return data?.session?.user || null;
+    function contextReady() {
+        return Boolean(window.FinNestContext?.get?.().loaded);
     }
 
-    // A user can belong to more than one household. Until FinNest has an
-    // explicit household switch, prefer the household where this user is the owner.
-    async function getHouseholdId(userId) {
-        const { data, error } = await supabase
-            .from('household_members')
-            .select('household_id, role, created_at')
-            .eq('user_id', userId)
-            .order('role', { ascending: false })
-            .order('created_at', { ascending: true });
+    async function getContext() {
+        if (!supabase) return null;
+        if (window.FinNestContext) return window.FinNestContext.load();
+        const { data: session, error } = await supabase.auth.getSession();
         if (error) throw error;
-        if (!data?.length) return null;
-        const owner = data.find(member => member.role === 'owner');
-        return (owner || data[0]).household_id;
+        return { user: session?.session?.user || null, householdId: null };
+    }
+
+    async function getUser() {
+        const ctx = await getContext();
+        return ctx?.user || null;
+    }
+
+    async function getHouseholdId() {
+        const ctx = await getContext();
+        return ctx?.householdId || null;
     }
 
     function periodInfo(period) {
@@ -45,9 +46,10 @@
     }
 
     async function load(scope, period) {
-        const user = await getUser();
+        const ctx = await getContext();
+        const user = ctx?.user;
         if (!user) return { user: null, householdId: null, budgets: [], expenses: [] };
-        const householdId = scope === 'family' ? await getHouseholdId(user.id) : null;
+        const householdId = scope === 'family' ? ctx.householdId : null;
         const info = periodInfo(period);
         const startKey = dateKey(info.start);
         const endKey = dateKey(info.end);
@@ -74,13 +76,13 @@
 
     function notifyBudgetChanged(scope, period) {
         window.dispatchEvent(new CustomEvent('finnest:budget-changed', { detail: { scope, period } }));
-        if (scope === 'family' && window.FinNestViewMode?.get?.() === 'family') window.FinNestViewMode.refresh().catch(() => {});
     }
 
     async function saveBudget(scope, period, category, amount, existingId = null) {
-        const user = await getUser();
+        const ctx = await getContext();
+        const user = ctx?.user;
         if (!user) throw new Error('Please sign in first.');
-        const householdId = scope === 'family' ? await getHouseholdId(user.id) : null;
+        const householdId = scope === 'family' ? ctx.householdId : null;
         if (scope === 'family' && !householdId) throw new Error('You need a family household before creating a family budget.');
         const startKey = dateKey(periodInfo(period).start);
         const row = {
@@ -126,8 +128,8 @@
             .budget-scope-toolbar button{border:0;background:transparent;color:#64748B;padding:9px 14px;border-radius:9px;font-weight:700;cursor:pointer}.budget-scope-toolbar button.active{background:#fff;color:#047857;box-shadow:0 1px 4px #CBD5E1}
             .budget-period{display:flex;gap:8px;margin-bottom:18px}.budget-period button{border:1px solid #D1FAE5;background:#fff;color:#047857;border-radius:9px;padding:8px 12px;font-weight:700;cursor:pointer}.budget-period button.active{background:#10B981;color:#fff}
             .budget-context{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:#ECFDF5;color:#065F46;font-size:12px}.budget-context strong{font-size:13px}.budget-scope-grid{display:grid;gap:10px}.budget-scope-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 110px;align-items:center;gap:12px;padding:13px;border:1px solid #E2E8F0;border-radius:12px;background:#fff}.budget-scope-row input{width:100%;padding:9px 10px;border:1px solid #CBD5E1;border-radius:9px;font:inherit}.budget-scope-name{font-weight:700;color:#334155}.budget-scope-meta{font-size:11px;color:#64748B;margin-top:3px}.budget-scope-actions{display:flex;gap:6px;justify-content:flex-end}.budget-scope-actions button{border:0;background:#F1F5F9;color:#475569;border-radius:8px;padding:7px 9px;font-size:11px;cursor:pointer}.budget-scope-actions .danger{color:#B91C1C}.budget-scope-empty{padding:24px;text-align:center;color:#64748B;border:1px dashed #CBD5E1;border-radius:12px}
-            .family-view .weekly-budget-panel{display:none!important}
-            @media(max-width:700px){.budget-scope-toolbar{width:100%}.budget-scope-toolbar button{flex:1}.budget-scope-row{grid-template-columns:1fr 120px}.budget-scope-actions{grid-column:1/-1;justify-content:flex-start}.budget-period{width:100%}.budget-period button{flex:1}}
+            .budget-editor-row select,.budget-editor-row input{min-height:40px;padding:9px 10px;border:1px solid #CBD5E1;border-radius:9px;background:#fff;color:#334155;font:inherit;box-sizing:border-box}.budget-editor-row select:focus,.budget-editor-row input:focus{outline:none;border-color:#10B981;box-shadow:0 0 0 3px rgba(16,185,129,.10)}
+            @media(max-width:700px){.budget-scope-toolbar{width:100%}.budget-scope-toolbar button{flex:1}.budget-scope-row{grid-template-columns:1fr 120px}.budget-scope-actions{grid-column:1/-1;justify-content:flex-start}.budget-period{width:100%}.budget-period button{flex:1}.budget-editor-row{grid-template-columns:1fr!important}.budget-editor-row button{width:100%}}
         `; document.head.appendChild(s);
     }
 
@@ -135,6 +137,10 @@
         injectStyles();
         const container = document.getElementById('finnestDynamicView');
         if (!container) return;
+        if (window.FinNestContext && !contextReady()) {
+            container.innerHTML = `<div class="budget-scope-empty">Loading your FinNest context…</div>`;
+            try { await window.FinNestContext.load(); } catch (e) { container.innerHTML = `<div class="budget-scope-empty">Unable to load account context: ${escapeHtml(e.message || 'Unknown error')}</div>`; return; }
+        }
         let scope = 'personal';
         let period = 'monthly';
         const paint = async () => {
