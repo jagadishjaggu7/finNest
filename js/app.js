@@ -252,7 +252,9 @@ function ensureDashboardActions() {
     actions.className = "finnest-header-actions";
     actions.innerHTML = `<button class="finnest-secondary-button" id="quickIncomeButton">+ Add Income</button>`;
     header.parentElement.appendChild(actions);
-    document.getElementById("quickIncomeButton").onclick = openIncomeModal;
+    const button = document.getElementById("quickIncomeButton");
+    if (button) button.type = "button";
+    if (button) button.onclick = openIncomeModal;
 }
 
 async function refreshIncomeData() {
@@ -263,7 +265,7 @@ async function refreshIncomeData() {
 function openIncomeModal() {
     const modal = document.createElement("div");
     modal.className = "finnest-modal-backdrop";
-    modal.innerHTML = `<div class="finnest-modal"><div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2>Add Income</h2></div><button class="sheet-close" id="closeIncome">×</button></div><div class="expense-field"><label>Amount</label><div class="amount-input-wrapper"><span>₹</span><input id="incomeAmount" type="number" min="0" step="0.01" placeholder="0" inputmode="decimal"></div></div><div class="expense-field"><label>Source</label><input id="incomeSource" type="text" placeholder="Salary, freelance, bonus…"></div><div class="expense-field"><label>Date</label><input id="incomeDate" type="date" value="${todayString()}"></div><div class="expense-actions"><button class="cancel-expense" id="closeIncome2">Cancel</button><button class="save-expense" id="saveIncome">Add Income</button></div></div>`;
+    modal.innerHTML = `<div class="finnest-modal"><div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2>Add Income</h2></div><button class="sheet-close" id="closeIncome">×</button></div><div class="expense-field"><label>Amount</label><div class="amount-input-wrapper"><span>₹</span><input id="incomeAmount" type="number" min="0" step="0.01" placeholder="0" inputmode="decimal"></div></div><div class="expense-field"><label>Source</label><input id="incomeSource" type="text" placeholder="Salary, freelance, bonus…"></div><div class="expense-field"><label>Date</label><input id="incomeDate" type="date" value="${todayString()}"></div><div class="expense-actions"><button class="cancel-expense" id="closeIncome2" type="button">Cancel</button><button class="save-expense" id="saveIncome" type="button">Add Income</button></div></div>`;
     document.body.appendChild(modal);
     document.body.style.overflow = "hidden";
     const close = () => { modal.remove(); document.body.style.overflow = ""; };
@@ -406,3 +408,76 @@ function openEditExpense(id) {
     const expense = expenses.find(e => e.id === id);
     if (expense) openExpenseSheet("edit", expense);
 }
+
+function renderExpensesView() {
+    const categories = ["All", ...Object.keys(CATEGORY_META)];
+    const accounts = ["All", "UPI", "Bank Account", "Cash", "Credit Card"];
+    const container = getDynamicView();
+    container.innerHTML = `<div class="view-heading"><div><p class="eyebrow">Every transaction in one place</p><h1>Expenses</h1></div><button class="finnest-primary-button" id="viewAddExpense" type="button">+ Add Expense</button></div><div class="filter-bar"><input id="expenseSearch" placeholder="Search notes, categories or accounts…"><select id="expenseCategoryFilter"><option>All</option>${categories.slice(1).map(c => `<option>${escapeHtml(c)}</option>`).join("")}</select><select id="expenseAccountFilter">${accounts.map(a => `<option>${escapeHtml(a)}</option>`).join("")}</select><select id="expenseTypeFilter"><option value="All">All types</option><option value="personal">Personal</option><option value="shared">Shared</option></select></div><div id="expenseList" class="expense-list"></div>`;
+    document.getElementById("viewAddExpense").onclick = () => openExpenseSheet();
+    ["expenseSearch", "expenseCategoryFilter", "expenseAccountFilter", "expenseTypeFilter"].forEach(id => document.getElementById(id).addEventListener("input", renderExpenseList));
+    renderExpenseList();
+}
+
+function renderExpenseList() {
+    const list = document.getElementById("expenseList");
+    if (!list) return;
+    const q = document.getElementById("expenseSearch")?.value.toLowerCase() || "";
+    const category = document.getElementById("expenseCategoryFilter")?.value || "All";
+    const account = document.getElementById("expenseAccountFilter")?.value || "All";
+    const type = document.getElementById("expenseTypeFilter")?.value || "All";
+    const filtered = expenses.filter(expense => {
+        const matchesQuery = [expense.note, expense.category, expense.account].some(value => String(value || "").toLowerCase().includes(q));
+        const matchesCategory = category === "All" || expense.category === category;
+        const matchesAccount = account === "All" || expense.account === account;
+        const matchesType = type === "All" || expense.type === type;
+        return matchesQuery && matchesCategory && matchesAccount && matchesType;
+    });
+    if (!filtered.length) {
+        list.innerHTML = `<div class="empty-state">No expenses match your filters.</div>`;
+        return;
+    }
+    list.innerHTML = filtered.map(expense => `<button class="expense-row" data-expense-id="${expense.id}" type="button"><span class="expense-row-icon">${getCategoryIcon(expense.category)}</span><span class="expense-row-main"><strong>${escapeHtml(expense.note || expense.category)}</strong><small>${escapeHtml(expense.category)} · ${escapeHtml(expense.account)} · ${formatDate(expense.date)}${expense.type === "shared" ? " · Shared" : ""}</small></span><strong class="expense-row-amount">-${formatCurrency(expense.amount)}</strong></button>`).join("");
+    list.querySelectorAll("[data-expense-id]").forEach(row => row.onclick = () => openEditExpense(Number(row.dataset.expenseId)));
+}
+
+function renderCurrentView() {
+    if (currentView === "Expenses") renderExpensesView();
+    if (currentView === "Dashboard") renderDashboard();
+}
+
+function getDynamicView() {
+    let container = document.getElementById("dynamicView");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "dynamicView";
+        container.className = "main-dynamic-view";
+        document.querySelector(".main-content")?.appendChild(container);
+    }
+    return container;
+}
+
+function bootApp() {
+    renderDashboard();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".category-chip").forEach(chip => chip.addEventListener("click", () => {
+        document.querySelectorAll(".category-chip").forEach(item => item.classList.remove("selected"));
+        chip.classList.add("selected");
+    }));
+
+    document.querySelectorAll(".type-option").forEach(option => option.addEventListener("click", () => {
+        document.querySelectorAll(".type-option").forEach(item => item.classList.remove("selected"));
+        option.classList.add("selected");
+        const payer = document.getElementById("expensePayerField");
+        if (payer) payer.style.display = option.dataset.type === "shared" ? "block" : "none";
+    }));
+
+    document.getElementById("closeExpenseSheet")?.addEventListener("click", closeExpenseSheet);
+    document.getElementById("cancelExpense")?.addEventListener("click", closeExpenseSheet);
+    document.getElementById("saveExpense")?.addEventListener("click", saveExpenseFromForm);
+    document.getElementById("desktopAddExpense")?.addEventListener("click", () => openExpenseSheet());
+
+    bootApp();
+});
