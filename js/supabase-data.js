@@ -116,12 +116,6 @@
         window.dispatchEvent(new CustomEvent('finnest:cloud-data-ready'));
     }
 
-    /*
-     * Explicit CRUD bridge for legacy app.js callers.
-     * These methods intentionally do not delete unrelated cloud rows.
-     * Feature-specific services will progressively replace these compatibility
-     * methods in later phases.
-     */
     async function syncExpense(expense) {
         const user = await currentUser();
         if (!user || !expense) return null;
