@@ -13,10 +13,6 @@
     const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
     const escapeHtml = value => String(value ?? '').replace(/[&<>\"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;', "'":'&#39;' }[c]));
 
-    function contextReady() {
-        return Boolean(window.FinNestContext?.get?.().loaded);
-    }
-
     async function getContext() {
         if (!supabase) return null;
         if (window.FinNestContext) return window.FinNestContext.load();
@@ -25,14 +21,8 @@
         return { user: session?.session?.user || null, householdId: null };
     }
 
-    async function getUser() {
-        const ctx = await getContext();
-        return ctx?.user || null;
-    }
-
-    async function getHouseholdId() {
-        const ctx = await getContext();
-        return ctx?.householdId || null;
+    function contextReady() {
+        return Boolean(window.FinNestContext?.get?.().loaded);
     }
 
     function periodInfo(period) {
