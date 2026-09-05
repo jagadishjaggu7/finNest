@@ -36,24 +36,11 @@
         const map = idMap();
         map.incomes = map.incomes || {};
         const uuid = id ? map.incomes[id] : null;
-        const row = {
-            user_id: user.id,
-            amount: numericAmount,
-            source: incomeSource,
-            income_date: incomeDate
-        };
+        const row = { user_id: user.id, amount: numericAmount, source: incomeSource, income_date: incomeDate };
 
         const result = uuid
-            ? await client().from("incomes")
-                .update(row)
-                .eq("id", uuid)
-                .eq("user_id", user.id)
-                .select("id,amount,source,income_date")
-                .maybeSingle()
-            : await client().from("incomes")
-                .insert(row)
-                .select("id,amount,source,income_date")
-                .single();
+            ? await client().from("incomes").update(row).eq("id", uuid).eq("user_id", user.id).select("id,amount,source,income_date").maybeSingle()
+            : await client().from("incomes").insert(row).select("id,amount,source,income_date").single();
 
         if (result.error) throw result.error;
         if (!result.data) throw new Error("Income could not be saved.");
@@ -61,33 +48,19 @@
         const localId = id || Date.now();
         map.incomes[localId] = result.data.id;
         saveMap(map);
-        return {
-            id: localId,
-            amount: Number(result.data.amount || 0),
-            source: result.data.source || "Other income",
-            date: result.data.income_date
-        };
+        return { id: localId, amount: Number(result.data.amount || 0), source: result.data.source || "Other income", date: result.data.income_date };
     }
 
     async function remove(id) {
         const user = await currentUser();
         if (!user) throw new Error("Please sign in first.");
         if (!id) throw new Error("Income ID is required.");
-
         const map = idMap();
         const uuid = map.incomes?.[id];
         if (!uuid) throw new Error("Income not found or not editable.");
-
-        const { data, error } = await client().from("incomes")
-            .delete()
-            .eq("id", uuid)
-            .eq("user_id", user.id)
-            .select("id")
-            .maybeSingle();
-
+        const { data, error } = await client().from("incomes").delete().eq("id", uuid).eq("user_id", user.id).select("id").maybeSingle();
         if (error) throw error;
         if (!data) throw new Error("Income not found or not editable.");
-
         delete map.incomes[id];
         saveMap(map);
         return data;
