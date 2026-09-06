@@ -77,6 +77,7 @@
 
         expenses = (expensesResult.data || []).map(e => ({
             id: localId("expenses", e.id),
+            cloudId: e.id,
             amount: Number(e.amount || 0),
             category: e.category || "Other",
             account: accountNames[e.account_id] || "Other",
@@ -89,6 +90,7 @@
 
         incomes = (incomesResult.data || []).map(i => ({
             id: localId("incomes", i.id),
+            cloudId: i.id,
             amount: Number(i.amount || 0),
             source: i.source || "Other income",
             date: i.income_date
@@ -122,7 +124,7 @@
         const accounts = await accountsFor(user.id);
         const map = idMap();
         map.expenses = map.expenses || {};
-        const uuid = map.expenses[expense.id];
+        const uuid = expense.cloudId || map.expenses[expense.id];
         const row = {
             user_id: user.id,
             household_id: expense.type === "shared" ? (expense.householdId || window.FinNestContext?.getHouseholdId?.() || null) : null,
@@ -139,7 +141,10 @@
             ? await client().from("expenses").update(row).eq("id", uuid).eq("user_id", user.id).select("id").maybeSingle()
             : await client().from("expenses").insert(row).select("id").single();
         if (result.error) throw result.error;
-        if (result.data?.id) map.expenses[expense.id] = result.data.id;
+        if (result.data?.id) {
+            map.expenses[expense.id] = result.data.id;
+            expense.cloudId = result.data.id;
+        }
         saveJson(MAP_KEY, map);
         return result.data?.id || uuid || null;
     }
@@ -149,7 +154,7 @@
         if (!user || !income) return null;
         const map = idMap();
         map.incomes = map.incomes || {};
-        const uuid = map.incomes[income.id];
+        const uuid = income.cloudId || map.incomes[income.id];
         const row = {
             user_id: user.id,
             amount: Number(income.amount || 0),
@@ -160,7 +165,10 @@
             ? await client().from("incomes").update(row).eq("id", uuid).eq("user_id", user.id).select("id").maybeSingle()
             : await client().from("incomes").insert(row).select("id").single();
         if (result.error) throw result.error;
-        if (result.data?.id) map.incomes[income.id] = result.data.id;
+        if (result.data?.id) {
+            map.incomes[income.id] = result.data.id;
+            income.cloudId = result.data.id;
+        }
         saveJson(MAP_KEY, map);
         return result.data?.id || uuid || null;
     }
@@ -182,7 +190,7 @@
             console.error("FinNest cloud bootstrap failed", error);
             window.dispatchEvent(new CustomEvent('finnest:cloud-data-ready'));
             if (typeof renderDashboard === 'function') renderDashboard();
-            alert("FinNest could not load cloud data. Please check your connection and Supabase configuration.");
+            console.warn("FinNest cloud bootstrap could not complete", error);
         }
     }
 
