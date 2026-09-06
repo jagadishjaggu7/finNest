@@ -11,7 +11,6 @@
     let originalOpenExpenseSheet = null;
     let originalSaveExpenseFromForm = null;
     let originalOpenEditExpense = null;
-    let originalRenderFamilyView = null;
 
     function localSnapshot() {
         try {
@@ -54,6 +53,7 @@
         if (sessionError) throw sessionError;
         const user = sessionData?.session?.user;
         if (!user) return null;
+        context.user = user;
         return context;
     }
 
@@ -123,8 +123,7 @@
         localSnapshot();
         window.dispatchEvent(new CustomEvent('finnest:family-data-ready'));
 
-        if (typeof currentView !== 'undefined' && currentView === 'Family' && typeof renderFamilyView === 'function') renderFamilyView();
-        else if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') renderExpensesView();
+        if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') renderExpensesView();
         else if (typeof renderDashboard === 'function') renderDashboard();
     }
 
@@ -211,11 +210,6 @@
                 return;
             }
             originalOpenEditExpense(id);
-        };
-
-        originalRenderFamilyView = renderFamilyView;
-        renderFamilyView = function () {
-            originalRenderFamilyView();
         };
     }
 
