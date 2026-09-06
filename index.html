@@ -29,18 +29,32 @@
                 </nav>
             </aside>
             <main class="main-content">
-                <section class="page-header"><div><p class="eyebrow">Sunday, 16 August</p><h1>Welcome to FinNest 👋</h1></div></section>
-                <section class="summary-grid">
-                    <article class="summary-card"><div class="summary-card-top"><span>Available</span><span class="summary-icon">₹</span></div><strong id="totalBalance">₹0</strong><p class="positive">Current month</p></article>
-                    <article class="summary-card"><div class="summary-card-top"><span>Income</span><span class="summary-icon income">↓</span></div><strong id="totalIncome">₹0</strong><p class="positive">Current month</p></article>
-                    <article class="summary-card"><div class="summary-card-top"><span>Expenses</span><span class="summary-icon expense">↑</span></div><strong id="totalExpenses">₹0</strong><p class="negative">Current month</p></article>
-                    <article class="summary-card"><div class="summary-card-top"><span>Savings Rate</span><span class="summary-icon savings">♧</span></div><strong id="savingsRate">0%</strong><p class="positive">Current month</p></article>
-                </section>
-                <section class="dashboard-grid">
-                    <article class="dashboard-card expense-overview"><div class="card-header"><h2>Expense Overview</h2><select><option>This Month</option><option>Last Month</option><option>This Year</option></select></div><div class="chart-area"><div class="donut-chart"><div class="donut-center"><strong id="donutTotal">₹0</strong><span>Total</span></div></div><div class="category-list" id="expenseCategoryList"></div></div><button class="text-link">View report →</button></article>
-                    <article class="dashboard-card"><div class="card-header"><h2>Recent Transactions</h2><button class="text-link">View All</button></div><div class="transactions" id="recentTransactions"></div></article>
-                </section>
-                <section class="dashboard-card budget-section"><div class="card-header"><h2>Budget Overview</h2><button class="text-link">View All Budgets →</button></div><div class="budget-grid"></div></section>
+                <div id="dashboardPage">
+                    <section class="page-header">
+                        <div><p class="eyebrow">Sunday, 16 August</p><h1>Welcome to FinNest 👋</h1></div>
+                        <div class="page-actions">
+                            <button id="dashboardIncomeBtn" class="primary-btn" type="button"><span aria-hidden="true">+</span><span>Add Income</span></button>
+                        </div>
+                    </section>
+                    <section class="summary-grid">
+                        <article class="summary-card"><div class="summary-card-top"><span>Available</span><span class="summary-icon">₹</span></div><strong id="totalBalance">₹0</strong><p class="positive">Current month</p></article>
+                        <article class="summary-card"><div class="summary-card-top"><span>Income</span><span class="summary-icon income">↓</span></div><strong id="totalIncome">₹0</strong><p class="positive">Current month</p></article>
+                        <article class="summary-card"><div class="summary-card-top"><span>Expenses</span><span class="summary-icon expense">↑</span></div><strong id="totalExpenses">₹0</strong><p class="negative">Current month</p></article>
+                        <article class="summary-card"><div class="summary-card-top"><span>Savings Rate</span><span class="summary-icon savings">♧</span></div><strong id="savingsRate">0%</strong><p class="positive">Current month</p></article>
+                    </section>
+                    <section class="dashboard-grid">
+                        <article class="dashboard-card expense-overview"><div class="card-header"><h2>Expense Overview</h2><select id="expenseOverviewPeriod"><option value="this-month">This Month</option><option value="last-month">Last Month</option><option value="this-year">This Year</option></select></div><div class="chart-area"><div class="donut-chart"><div class="donut-center"><strong id="donutTotal">₹0</strong><span>Total</span></div></div><div class="category-list" id="expenseCategoryList"></div></div><button class="text-link" id="viewExpenseReport" type="button">View report →</button></article>
+                        <article class="dashboard-card"><div class="card-header"><h2>Recent Transactions</h2><button class="text-link" id="viewAllTransactions" type="button">View All</button></div><div class="transactions" id="recentTransactions"></div></article>
+                    </section>
+                    <section class="dashboard-grid dashboard-income-grid">
+                        <article class="dashboard-card income-section">
+                            <div class="card-header"><h2>Recent Income</h2><button class="text-link" id="viewAllIncome" type="button">View All</button></div>
+                            <div class="income-list" id="recentIncomeList"></div>
+                        </article>
+                    </section>
+                    <section class="dashboard-card budget-section"><div class="card-header"><h2>Budget Overview</h2><button class="text-link" id="viewAllBudgets" type="button">View All Budgets →</button></div><div class="budget-grid"></div></section>
+                </div>
+                <div id="dynamicView" class="main-dynamic-view" hidden></div>
             </main>
             <div class="expense-sheet-backdrop" id="expenseSheet">
                 <div class="expense-sheet"><div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">FinNest</p><h2>Add Expense</h2></div><button class="sheet-close" id="closeExpenseSheet" aria-label="Close">×</button></div>
@@ -62,12 +76,15 @@
         <script src="js/auth-data-gate.js"></script>
         <script src="js/session-safety.js"></script>
         <script src="js/runtime-safety.js"></script>
+        <script src="js/context.js"></script>
+        <script src="js/income-service.js"></script>
+        <script src="js/budget-service.js"></script>
+        <script src="js/supabase-data.js"></script>
         <script src="js/app.js"></script>
         <script src="js/mobile-nav.js"></script>
         <script src="js/header-actions.js"></script>
         <script src="js/auth.js"></script>
         <script src="js/auth-ui.js"></script>
-        <script src="js/supabase-data.js"></script>
         <script src="js/supabase-auth-hook.js"></script>
         <script src="js/budget-scope.js"></script>
         <script src="js/settings-cloud.js"></script>

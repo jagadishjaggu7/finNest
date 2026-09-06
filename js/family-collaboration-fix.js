@@ -1,6 +1,7 @@
-/* FinNest family collaboration fix.
-   Keeps shared transactions household-wide while personal data remains private.
-   Also normalizes payer IDs to member names and enforces creator-only edit/delete. */
+/* FinNest family collaboration compatibility layer.
+   Uses the shared runtime context for household/member resolution.
+   The later expense-service phase will replace these wrappers with one write path.
+*/
 (function () {
     const supabase = window.finnestSupabase;
     if (!supabase) return;
@@ -10,7 +11,6 @@
     let originalOpenExpenseSheet = null;
     let originalSaveExpenseFromForm = null;
     let originalOpenEditExpense = null;
-    let originalRenderFamilyView = null;
 
     function localSnapshot() {
         try {
@@ -38,29 +38,22 @@
     }
 
     async function loadContext() {
+        if (window.FinNestContext) {
+            const ctx = await window.FinNestContext.load();
+            context = {
+                user: ctx?.user || null,
+                householdId: ctx?.householdId || null,
+                members: ctx?.members || []
+            };
+            window.FinNestFamilyContext = context;
+            return context;
+        }
+
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
         const user = sessionData?.session?.user;
         if (!user) return null;
-
-        const { data: membership, error: membershipError } = await supabase
-            .from('household_members')
-            .select('household_id')
-            .eq('user_id', user.id)
-            .limit(1)
-            .maybeSingle();
-        if (membershipError) throw membershipError;
-        if (!membership?.household_id) return { user, householdId: null, members: [] };
-
-        const { data: members, error: membersError } = await supabase
-            .from('household_members')
-            .select('id,user_id,display_name,role,created_at')
-            .eq('household_id', membership.household_id)
-            .order('created_at', { ascending: true });
-        if (membersError) throw membersError;
-
-        context = { user, householdId: membership.household_id, members: members || [] };
-        window.FinNestFamilyContext = context;
+        context.user = user;
         return context;
     }
 
@@ -121,8 +114,6 @@
             else if (familyPayers[localId] && !memberByName(familyPayers[localId])) delete familyPayers[localId];
         }
 
-        // Remove stale household-shared rows that were deleted in Supabase.
-        // Keep locally created rows that have not received a cloud id yet.
         expenses = expenses.filter(e => {
             if (e.type !== 'shared' || e.householdId !== ctx.householdId) return true;
             return !e.cloudId || cloudIds.has(e.cloudId);
@@ -132,9 +123,11 @@
         localSnapshot();
         window.dispatchEvent(new CustomEvent('finnest:family-data-ready'));
 
-        if (typeof currentView !== 'undefined' && currentView === 'Family' && typeof renderFamilyView === 'function') renderFamilyView();
-        else if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') renderExpensesView();
-        else if (typeof renderDashboard === 'function') renderDashboard();
+        if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') {
+            renderExpensesView();
+        } else if (typeof renderDashboard === 'function') {
+            renderDashboard();
+        }
     }
 
     function selectedPayerId() {
@@ -221,11 +214,6 @@
             }
             originalOpenEditExpense(id);
         };
-
-        originalRenderFamilyView = renderFamilyView;
-        renderFamilyView = function () {
-            originalRenderFamilyView();
-        };
     }
 
     async function initialize() {
@@ -239,6 +227,7 @@
 
     document.addEventListener('DOMContentLoaded', () => setTimeout(initialize, 50), { once: true });
     document.addEventListener('finnest:authenticated', () => setTimeout(initialize, 100));
+    document.addEventListener('finnest:context-ready', () => setTimeout(() => hydrateSharedTransactions().catch(() => {}), 50));
     document.addEventListener('finnest:cloud-data-ready', () => setTimeout(() => hydrateSharedTransactions().catch(() => {}), 50));
 
     window.FinNestFamilyCollaboration = {
