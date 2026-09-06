@@ -18,7 +18,12 @@
         const style = document.createElement('style');
         style.id = 'finnestSettingsCloudStyles';
         style.textContent = `
-            .cloud-family-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+            .settings-page{display:grid;gap:18px}
+            .settings-page-title{margin:0;color:#0F172A;font-size:30px;line-height:1.2;letter-spacing:-.03em}
+            .settings-page-sub{margin:6px 0 0;color:#94A3B8;font-size:13px}
+            .settings-card{background:#fff;border:1px solid #E2E8F0;border-radius:18px;padding:22px;box-shadow:0 4px 12px rgba(15,23,42,.03)}
+            .settings-card h2{margin:0 0 6px;color:#0F172A;font-size:18px}.settings-card p{margin:0;color:#64748B;font-size:13px;line-height:1.5}
+            .cloud-family-list{display:flex;flex-direction:column;gap:10px;margin-top:16px}
             .cloud-family-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #E2E8F0;border-radius:14px;background:#fff}
             .cloud-family-avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#ECFDF5;color:#047857;font-size:11px;font-weight:800}
             .cloud-family-main{min-width:0}.cloud-family-role{display:block;margin-top:4px;color:#94A3B8;font-size:10px}
@@ -27,7 +32,11 @@
             .cloud-family-save{border:0;background:#10B981;color:#fff;border-radius:10px;padding:10px 14px;font:700 12px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.08)}
             .cloud-family-save:hover{background:#059669}.cloud-family-save:disabled{opacity:.55;cursor:wait}
             .cloud-family-empty{padding:16px;border:1px dashed #CBD5E1;border-radius:12px;color:#64748B;font-size:12px;background:#F8FAFC}
-            @media(max-width:600px){.cloud-family-row{grid-template-columns:34px minmax(0,1fr)}.cloud-family-save{grid-column:2;justify-self:start}}
+            .settings-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+            .finnest-secondary-button{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid #CBD5E1;border-radius:10px;background:#fff;color:#334155;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}
+            .finnest-secondary-button:hover{border-color:#94A3B8;background:#F8FAFC}.file-label{position:relative;overflow:hidden}.file-label input{position:absolute;inset:0;opacity:0;cursor:pointer}
+            .settings-danger{border-color:#FECACA}.settings-danger h2{color:#991B1B}.settings-danger .delete-expense-button{margin-top:14px}
+            @media(max-width:600px){.cloud-family-row{grid-template-columns:34px minmax(0,1fr)}.cloud-family-save{grid-column:2;justify-self:start}.settings-card{padding:18px}.settings-page-title{font-size:27px}}
         `;
         document.head.appendChild(style);
     }
@@ -75,9 +84,9 @@
 
     async function renderSettingsViewCloud() {
         styles();
-        const container = typeof getDynamicView === 'function' ? getDynamicView() : document.getElementById('finnestDynamicView');
+        const container = typeof getDynamicView === 'function' ? getDynamicView() : document.getElementById('dynamicView');
         if (!container) return;
-        container.innerHTML = `<div class="view-heading"><div><p class="eyebrow">Account & family settings</p><h1>Settings</h1></div></div><div class="settings-grid"><div class="dashboard-card"><h2>Family members</h2><p class="muted">Names are stored in your FinNest household and are used across shared expenses, budgets and reports.</p><div id="cloudFamilyMembers" class="cloud-family-list"><div class="cloud-family-empty">Loading family members…</div></div></div><div class="dashboard-card"><h2>Backup</h2><p class="muted">Download your local FinNest data as JSON and restore it later.</p><div class="settings-actions"><button class="finnest-secondary-button" id="exportJson">Export JSON</button><label class="finnest-secondary-button file-label">Import JSON<input id="importJson" type="file" accept="application/json" hidden></label></div></div><div class="dashboard-card danger-card"><h2>Local cache</h2><p class="muted">Reset only the browser prototype cache. This does not delete your Supabase account or household.</p><button class="delete-expense-button" id="resetData">Reset Local Cache</button></div></div>`;
+        container.innerHTML = `<div class="settings-page"><div><p class="eyebrow">Account & family settings</p><h1 class="settings-page-title">Settings</h1><p class="settings-page-sub">Manage household names, backups and local browser data.</p></div><div class="settings-card"><h2>Family members</h2><p>Names are stored in your FinNest household and are used across shared expenses, budgets and reports.</p><div id="cloudFamilyMembers" class="cloud-family-list"><div class="cloud-family-empty">Loading family members…</div></div></div><div class="settings-card"><h2>Backup</h2><p>Download your local FinNest data as JSON and restore it later.</p><div class="settings-actions"><button class="finnest-secondary-button" id="exportJson" type="button">Export JSON</button><label class="finnest-secondary-button file-label">Import JSON<input id="importJson" type="file" accept="application/json" hidden></label></div></div><div class="settings-card settings-danger"><h2>Local cache</h2><p>Reset only the browser prototype cache. This does not delete your Supabase account or household.</p><button class="delete-expense-button" id="resetData" type="button">Reset Local Cache</button></div></div>`;
 
         const host = container.querySelector('#cloudFamilyMembers');
         try {
@@ -90,7 +99,7 @@
             if (!context.members.length || !context.householdId) {
                 host.innerHTML = '<div class="cloud-family-empty">No family household is linked to this account yet. Open Family to create or join one.</div>';
             } else {
-                host.innerHTML = context.members.map(member => `<div class="cloud-family-row"><div class="cloud-family-avatar">${esc(initials(member.display_name))}</div><div class="cloud-family-main"><input value="${esc(member.display_name || '')}" data-member-id="${esc(member.id)}"><span class="cloud-family-role">${member.user_id === context.user.id ? 'You' : (member.role === 'owner' ? 'Owner' : 'Family member')}</span></div><button class="cloud-family-save" data-save-member="${esc(member.id)}">Save</button></div>`).join('');
+                host.innerHTML = context.members.map(member => `<div class="cloud-family-row"><div class="cloud-family-avatar">${esc(initials(member.display_name))}</div><div class="cloud-family-main"><input value="${esc(member.display_name || '')}" data-member-id="${esc(member.id)}"><span class="cloud-family-role">${member.user_id === context.user.id ? 'You' : (member.role === 'owner' ? 'Owner' : 'Family member')}</span></div><button class="cloud-family-save" data-save-member="${esc(member.id)}" type="button">Save</button></div>`).join('');
                 host.querySelectorAll('[data-save-member]').forEach(button => button.onclick = async () => {
                     const member = context.members.find(m => m.id === button.dataset.saveMember);
                     const input = host.querySelector(`[data-member-id="${button.dataset.saveMember}"]`);
