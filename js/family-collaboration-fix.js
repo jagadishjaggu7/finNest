@@ -123,8 +123,11 @@
         localSnapshot();
         window.dispatchEvent(new CustomEvent('finnest:family-data-ready'));
 
-        if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') renderExpensesView();
-        else if (typeof renderDashboard === 'function') renderDashboard();
+        if (typeof currentView !== 'undefined' && currentView === 'Expenses' && typeof renderExpensesView === 'function') {
+            renderExpensesView();
+        } else if (typeof renderDashboard === 'function') {
+            renderDashboard();
+        }
     }
 
     function selectedPayerId() {
